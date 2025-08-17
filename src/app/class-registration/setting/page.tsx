@@ -43,6 +43,7 @@ interface RowData {
 
 // 内部コンポーネント：useSearchParams を利用
 function SettingPageContent() {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   const searchParams = useSearchParams()
   const timetableIdStr = searchParams.get("tid")
   const timetableId = timetableIdStr ? parseInt(timetableIdStr, 10) : null
@@ -72,7 +73,7 @@ function SettingPageContent() {
   async function fetchAllLessonData() {
     try {
       const res = await fetch(
-        "https://tech0-schooldx-dev-appservice-python2-f9dneshxdrcbgjec.eastus-01.azurewebsites.net/lesson_registrations/all",
+        `${apiBaseUrl}/lesson_registrations/all`,
         { method: "GET" }
       )
       if (!res.ok) {
@@ -196,7 +197,7 @@ function SettingPageContent() {
     };
 
     try {
-      const res = await fetch("https://tech0-schooldx-dev-appservice-python2-f9dneshxdrcbgjec.eastus-01.azurewebsites.net/lesson_registrations/", {
+      const res = await fetch(`${apiBaseUrl}/lesson_registrations/`, {
         method: "POST",
         mode: "cors",
         redirect: "follow",

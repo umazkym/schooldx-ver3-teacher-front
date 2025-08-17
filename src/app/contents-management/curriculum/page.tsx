@@ -54,6 +54,8 @@ type PartGroup = {
 }
 
 export default function CurriculumPage() {
+
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   // =========================
   // State
   // =========================
@@ -78,7 +80,7 @@ export default function CurriculumPage() {
     try {
       // 1) /content/by_id/1 (GET)
       const contentRes = await fetch(
-        "https://tech0-schooldx-dev-appservice-python2-f9dneshxdrcbgjec.eastus-01.azurewebsites.net/content/by_id/1",
+        `${apiBaseUrl}/content/by_id/1`,
         {
           method: "GET",
           mode: "cors",
@@ -92,7 +94,7 @@ export default function CurriculumPage() {
 
       // 2) /lecture_videos (GET)
       const lectureRes = await fetch(
-        "https://tech0-schooldx-dev-appservice-python2-f9dneshxdrcbgjec.eastus-01.azurewebsites.net/lecture_videos/",
+        `${apiBaseUrl}/lecture_videos/`,
         {
           method: "GET",
           mode: "cors",
@@ -190,7 +192,7 @@ export default function CurriculumPage() {
       formData.append("file", file)
   
       // lesson_theme_id はクエリパラメータとして付与
-      const url = `https://tech0-schooldx-dev-appservice-python2-f9dneshxdrcbgjec.eastus-01.azurewebsites.net/lecture_videos/?lesson_theme_id=${themeId}`
+      const url = `${apiBaseUrl}/lecture_videos/?lesson_theme_id=${themeId}`
   
       const res = await fetch(url, {
         method: "POST",
@@ -221,7 +223,7 @@ export default function CurriculumPage() {
       setError("")
       setDeleting(true)
       const res = await fetch(
-        `https://tech0-schooldx-dev-appservice-python2-f9dneshxdrcbgjec.eastus-01.azurewebsites.net/lecture_videos/${video.lecture_video_id}`,
+        `${apiBaseUrl}/lecture_videos/${video.lecture_video_id}`,
         {
           method: "DELETE",
           mode: "cors",

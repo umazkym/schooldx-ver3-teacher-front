@@ -82,13 +82,14 @@ const questionIdToKeyMap: { [id: number]: { status: StudentStringKey, progress: 
  */
 function DashboardPageContent() {
   const router = useRouter();
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   /** Socket.IO 接続 **/
   const socketRef = useRef<Socket | null>(null);
   useEffect(() => {
     if (!socketRef.current) {
       socketRef.current = io(
-        "https://tech0-schooldx-dev-appservice-python2-f9dneshxdrcbgjec.eastus-01.azurewebsites.net",
+        `${apiBaseUrl}`,
         {
           transports: ["websocket"],
           withCredentials: true,
@@ -145,7 +146,7 @@ function DashboardPageContent() {
     (async () => {
       try {
         const res = await fetch(
-          `https://tech0-schooldx-dev-appservice-python2-f9dneshxdrcbgjec.eastus-01.azurewebsites.net/lesson_attendance/lesson_information?lesson_id=${lessonId}`
+          `${apiBaseUrl}/lesson_attendance/lesson_information?lesson_id=${lessonId}`
         );
         if (!res.ok) return;
         const d = (await res.json()) as LessonInformation;
@@ -221,7 +222,7 @@ function DashboardPageContent() {
 
     setStartingLesson(true);
     try {
-      const url = `https://tech0-schooldx-dev-appservice-python2-f9dneshxdrcbgjec.eastus-01.azurewebsites.net/api/answer-data-bulk/lessons/${lessonId}/themes/${themeId}/generate-answer-data`;
+      const url = `${apiBaseUrl}/api/answer-data-bulk/lessons/${lessonId}/themes/${themeId}/generate-answer-data`;
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -317,7 +318,7 @@ function DashboardPageContent() {
     const allStudentsData = await Promise.all(
       studentIds.map(async (studentId) => {
         try {
-          const url = `https://tech0-schooldx-dev-appservice-python2-f9dneshxdrcbgjec.eastus-01.azurewebsites.net/api/answers/?student_id=${studentId}&lesson_id=${lessonId}`;
+          const url = `${apiBaseUrl}/api/answers/?student_id=${studentId}&lesson_id=${lessonId}`;
           const res = await fetch(url);
           if (!res.ok) {
             if (res.status === 404) return { studentId, data: [] };

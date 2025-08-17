@@ -5,6 +5,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 function QuestionsListPageContent() {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   const router = useRouter();
   const searchParams = useSearchParams();
   // ダッシュボードやcontent-selectionから受け取る
@@ -63,7 +64,7 @@ interface LessonInformation {
     (async () => {
       try {
         const res = await fetch(
-          `https://tech0-schooldx-dev-appservice-python2-f9dneshxdrcbgjec.eastus-01.azurewebsites.net/lesson_attendance/lesson_information?lesson_id=${lessonId}`
+          `${apiBaseUrl}/lesson_attendance/lesson_information?lesson_id=${lessonId}`
         );
         if (!res.ok) return;
         const d = (await res.json()) as LessonInformation;

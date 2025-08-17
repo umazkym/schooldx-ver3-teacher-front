@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 
 export default function RealtimeDashboardCalendarPage() {
   const router = useRouter();
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   // 今日
   const today = new Date();
@@ -133,7 +134,7 @@ export default function RealtimeDashboardCalendarPage() {
     (async () => {
       try {
         const res = await fetch(
-          "https://tech0-schooldx-dev-appservice-python2-f9dneshxdrcbgjec.eastus-01.azurewebsites.net/lesson_attendance/calendar",
+          `${apiBaseUrl}/lesson_attendance/calendar`,
           { method: "GET" }
         );
         if (!res.ok) throw new Error(`GET calendar failed: ${res.status}`);

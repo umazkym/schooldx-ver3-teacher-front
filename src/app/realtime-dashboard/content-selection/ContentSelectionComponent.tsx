@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 
 export default function ContentSelectionComponent() {
   const router = useRouter();
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   const searchParams = useSearchParams();
   const lessonIdStr = searchParams.get("lesson_id");
   const lessonId   = lessonIdStr ? Number(lessonIdStr) : null;
@@ -63,7 +64,7 @@ export default function ContentSelectionComponent() {
     (async () => {
       try {
         const res  = await fetch(
-          `https://tech0-schooldx-dev-appservice-python2-f9dneshxdrcbgjec.eastus-01.azurewebsites.net/lesson_attendance/lesson_information?lesson_id=${lessonId}`
+          `${apiBaseUrl}/lesson_attendance/lesson_information?lesson_id=${lessonId}`
         );
         if (!res.ok) throw new Error(`GET lesson_information failed: ${res.status}`);
 
@@ -108,7 +109,7 @@ export default function ContentSelectionComponent() {
     await Promise.all(
       contents.map(async (content) => {
         try {
-          const res = await fetch(`https://tech0-schooldx-dev-appservice-python2-f9dneshxdrcbgjec.eastus-01.azurewebsites.net/api/answer-data-bulk/lessons/${lessonId}/themes/${content.id}/generate-answer-data`, {
+          const res = await fetch(`${apiBaseUrl}/api/answer-data-bulk/lessons/${lessonId}/themes/${content.id}/generate-answer-data`, {
             method: "POST",
           });
           if (!res.ok) {
