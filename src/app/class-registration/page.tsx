@@ -11,7 +11,14 @@ import { useRouter } from "next/navigation"
  */
 export default function ClassRegistrationPage() {
   const router = useRouter()
+
+  // --- ▼ここから追加▼ ---
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (!apiBaseUrl) {
+    // 環境変数が読み込めていない場合のエラー処理
+    return <div>エラー: APIのベースURLが設定されていません。</div>;
+  }
+  // --- ▲ここまで追加▲ ---
 
   // 「今日」
   const today = new Date()
