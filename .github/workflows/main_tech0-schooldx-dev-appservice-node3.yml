@@ -29,6 +29,16 @@ jobs:
           npm run build --if-present
           npm run test --if-present
 
+      - name: Copy artifact for deployment job
+        run: |
+          mkdir deploy
+          cp -r ./.next/standalone/. ./deploy
+          cp -r ./public ./deploy
+          cp -r ./.next/static/. ./deploy/.next/static
+
+      - name: Zip artifact for deployment
+        run: zip release.zip ./deploy -r
+
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
@@ -49,7 +59,7 @@ jobs:
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'tech0-schooldx-dev-appservice-node3'
+          app-name: 'tech0-schooldx-dev-appservice-node2'
           slot-name: 'Production'
-          package: .
+          package: ./deploy
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_F3620F85C1A04E639C0C1F72E67719B6 }}
