@@ -59,7 +59,7 @@ export default function ContentSelectionComponent() {
   const [isStarting, setIsStarting] = useState(false);
 
   useEffect(() => {
-    if (!lessonId) return;
+    if (!lessonId || !apiBaseUrl) return;
     setLoading(true);
     (async () => {
       try {
@@ -90,7 +90,7 @@ export default function ContentSelectionComponent() {
         setLoading(false);
       }
     })();
-  }, [lessonId]);
+  }, [lessonId, apiBaseUrl]);
 
   const handleStartLesson = async () => {
     if (!contents || contents.length === 0) {
@@ -99,6 +99,10 @@ export default function ContentSelectionComponent() {
     }
     if (!lessonId) {
       alert("lesson_id が見つかりません。");
+      return;
+    }
+    if (!apiBaseUrl) {
+      alert("APIのベースURLが設定されていません。");
       return;
     }
 

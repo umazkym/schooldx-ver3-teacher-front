@@ -7,28 +7,81 @@ import { useRouter } from "next/navigation"
  * 授業登録ページ
  * - 右側の時間割にダミー配置
  * - ユーザーが時間割をクリックすると { date, day_of_week, period, time } を
- *   /lesson_registrations/calendar へPOST → timetable_idを取得 → settingページへ移動
+ * /lesson_registrations/calendar へPOST → timetable_idを取得 → settingページへ移動
  */
 export default function ClassRegistrationPage() {
   const router = useRouter()
-
-  // --- ▼ここから追加▼ ---
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+  // --- ▼ Hooks呼び出しをコンポーネントのトップレベルに移動 ▼ ---
+  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
+  const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+  const [scheduleEntries, setScheduleEntries] = useState<LessonCalendarEntry[]>([]);
+  const today = useMemo(() => new Date(), []);
+  
+  // ────────────────
+  // ①  カレンダーAPI取得
+  // ────────────────
+  interface LessonCalendarEntry {
+    timetable_id: number
+    date: string        // "2025-03-12"
+    day_of_week: string // "水"
+    period: number
+    time: string        // "14:35-15:30"
+    lesson_id: number | null
+    class_id: number
+    lesson_name: string | null
+    delivery_status: boolean
+    lesson_status: boolean
+  }
+
+  useEffect(() => {
+    if (!apiBaseUrl) {
+        console.error("APIのベースURLが設定されていません。");
+        return;
+    }
+    ;(async () => {
+      try {
+        const res = await fetch(
+          `${apiBaseUrl}/lesson_attendance/calendar`,
+          { method: "GET" }
+        )
+        if (!res.ok) throw new Error(`GET calendar failed: ${res.status}`)
+        setScheduleEntries(await res.json())
+      } catch (e) {
+        console.error(e)
+      }
+    })()
+  }, [apiBaseUrl]); // 依存配列にapiBaseUrlを追加
+
+  // ────────────────
+  // ②  日付×時限マップ生成
+  // ────────────────
+  const scheduleMap = useMemo(() => {
+    const map: Record<
+      string,
+      Array<{ lessonName: string; classId: number | null } | null>
+    > = {}
+    scheduleEntries.forEach((e) => {
+      const key = e.date.replace(/-/g, "/")      // "yyyy/MM/dd"
+      if (!map[key]) map[key] = [null, null, null, null, null, null]
+      map[key][e.period - 1] = {
+        lessonName: e.lesson_name ?? "物理",
+        classId: e.class_id ?? null,
+      }
+    })
+    return map
+  }, [scheduleEntries])
+
+  // --- ▲ Hooksの移動ここまで ▲ ---
+  
+  // --- ▼ Hooks呼び出しの後に条件分岐を配置 ▼ ---
   if (!apiBaseUrl) {
     // 環境変数が読み込めていない場合のエラー処理
     return <div>エラー: APIのベースURLが設定されていません。</div>;
   }
-  // --- ▲ここまで追加▲ ---
-
-  // 「今日」
-  const today = new Date()
-
-  // カレンダー表示の年月
-  const [currentYear, setCurrentYear] = useState(today.getFullYear())
-  const [currentMonth, setCurrentMonth] = useState(today.getMonth()) // 0-based
-
-  // 時間割用：選択日(初期 = 今日)
-  const [selectedDate, setSelectedDate] = useState<Date>(today)
+  // --- ▲ 条件分岐の移動ここまで ▲ ---
 
   // 前の月に移動
   const handlePrevMonth = () => {
@@ -90,90 +143,7 @@ export default function ClassRegistrationPage() {
     { period: 5, label: "5限\n13:30~14:25", time: "13:30-14:25" },
     { period: 6, label: "6限\n14:35~15:30", time: "14:35-15:30" },
   ]
-
-  /**
-   * ダミーデータ(2/15～3/31)
-   */
-  // const SCHEDULE_DATA = [
-    // { date: "2025/02/15", period: 1, subject: "物理基礎", grade: "1年", className: "A組" },
-    // { date: "2025/02/15", period: 3, subject: "物理", grade: "2年", className: "C組" },
-    // { date: "2025/02/16", period: 2, subject: "物理(演習)", grade: "3年", className: "Z組" },
-    // { date: "2025/02/17", period: 4, subject: "物理基礎", grade: "2年", className: "D組" },
-    // { date: "2025/02/17", period: 5, subject: "物理(補講)", grade: "3年", className: "E組" },
-    // { date: "2025/02/20", period: 1, subject: "物理", grade: "2年", className: "F組" },
-    // { date: "2025/02/22", period: 6, subject: "物理基礎", grade: "1年", className: "A組" },
-    // { date: "2025/02/26", period: 2, subject: "物理", grade: "3年", className: "C組" },
-    // { date: "2025/02/28", period: 3, subject: "物理基礎", grade: "2年", className: "G組" },
-    // { date: "2025/03/01", period: 5, subject: "物理(補講)", grade: "3年", className: "H組" },
-    // { date: "2025/03/04", period: 1, subject: "物理基礎", grade: "1年", className: "B組" },
-    // { date: "2025/03/08", period: 4, subject: "物理", grade: "2年", className: "Y組" },
-    // { date: "2025/03/12", period: 2, subject: "物理基礎", grade: "1年", className: "C組" },
-    // { date: "2025/03/14", period: 6, subject: "物理(演習)", grade: "2年", className: "A組" },
-    // { date: "2025/03/18", period: 3, subject: "物理", grade: "3年", className: "C組" },
-    // { date: "2025/03/22", period: 2, subject: "物理基礎", grade: "2年", className: "B組" },
-    // { date: "2025/03/24", period: 5, subject: "物理", grade: "3年", className: "Z組" },
-    // { date: "2025/03/26", period: 6, subject: "物理(補講)", grade: "1年", className: "K組" },
-    // { date: "2025/03/28", period: 1, subject: "物理基礎", grade: "1年", className: "A組" },
-  //   { date: "2025/03/12", period: 6, subject: "物理", grade: "1年", className: "A組" },
-  // ]
-
-  /**
-   * ────────────────
-   * ①  カレンダーAPI取得
-   * ────────────────
-   */
-  interface LessonCalendarEntry {
-    timetable_id: number
-    date: string        // "2025-03-12"
-    day_of_week: string // "水"
-    period: number
-    time: string        // "14:35-15:30"
-    lesson_id: number | null
-    class_id: number
-    lesson_name: string | null
-    delivery_status: boolean
-    lesson_status: boolean
-  }
-
-  const [scheduleEntries, setScheduleEntries] = useState<LessonCalendarEntry[]>([])
-
-  useEffect(() => {
-    ;(async () => {
-      try {
-        const res = await fetch(
-          `${apiBaseUrl}/lesson_attendance/calendar`,
-          { method: "GET" }
-        )
-        if (!res.ok) throw new Error(`GET calendar failed: ${res.status}`)
-        setScheduleEntries(await res.json())
-      } catch (e) {
-        console.error(e)
-      }
-    })()
-  }, [])
-
-  /**
-   * ────────────────
-   * ②  日付×時限マップ生成
-   * ────────────────
-   */
-  const scheduleMap = useMemo(() => {
-    const map: Record<
-      string,
-      Array<{ lessonName: string; classId: number | null } | null>
-    > = {}
-    scheduleEntries.forEach((e) => {
-      const key = e.date.replace(/-/g, "/")      // "yyyy/MM/dd"
-      if (!map[key]) map[key] = [null, null, null, null, null, null]
-      map[key][e.period - 1] = {
-        // lessonName: e.lesson_name ?? "物理",
-        lessonName:"物理",
-        classId: e.class_id ?? null,
-      }
-    })
-    return map
-  }, [scheduleEntries])
-
+  
   // 曜日取得
   function toJapaneseDayOfWeek(d: Date) {
     const dayNum = d.getDay()

@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 /**
  * リアルタイムダッシュボード ＞ カレンダビュー
  * - 「授業登録」と同じUIレイアウトで、左に「月カレンダー」(前の月/次の月ボタン)、
- *   右に「選択週(月~金)」の時間割を表示。
+ * 右に「選択週(月~金)」の時間割を表示。
  * - "開始する授業を選択してください" の文言を上に表示。
  * - 時間割クリック時に `/realtime-dashboard/content-selection` へ遷移し、クエリに dateInfo を付与。
  * - ダミーデータ: 2/15 ~ 3/31 にだけ授業がある。
@@ -85,31 +85,6 @@ export default function RealtimeDashboardCalendarPage() {
     { period: 6, label: "6限\n14:35~15:30" },
   ];
 
-  // ダミー時間割 (2/15~3/31)
-  // const SCHEDULE_DATA = [
-    // { date: "2025/02/15", period: 1, subject: "物理基礎", grade: "1年", className: "A組" },
-    // { date: "2025/02/15", period: 3, subject: "物理", grade: "2年", className: "C組" },
-    // { date: "2025/02/16", period: 2, subject: "物理(演習)", grade: "3年", className: "Z組" },
-    // { date: "2025/02/17", period: 4, subject: "物理基礎", grade: "2年", className: "D組" },
-    // { date: "2025/02/17", period: 5, subject: "物理(補講)", grade: "3年", className: "E組" },
-    // { date: "2025/02/20", period: 1, subject: "物理", grade: "2年", className: "F組" },
-    // { date: "2025/02/22", period: 6, subject: "物理基礎", grade: "1年", className: "A組" },
-    // { date: "2025/02/26", period: 2, subject: "物理", grade: "3年", className: "C組" },
-    // { date: "2025/02/28", period: 3, subject: "物理基礎", grade: "2年", className: "G組" },
-    // { date: "2025/03/01", period: 5, subject: "物理(補講)", grade: "3年", className: "H組" },
-    // { date: "2025/03/04", period: 1, subject: "物理基礎", grade: "1年", className: "B組" },
-    // { date: "2025/03/08", period: 4, subject: "物理", grade: "2年", className: "Y組" },
-    // { date: "2025/03/12", period: 2, subject: "物理基礎", grade: "1年", className: "C組" },
-    // { date: "2025/03/14", period: 6, subject: "物理(演習)", grade: "2年", className: "A組" },
-    // { date: "2025/03/18", period: 3, subject: "物理", grade: "3年", className: "C組" },
-    // { date: "2025/03/22", period: 2, subject: "物理基礎", grade: "2年", className: "B組" },
-    // { date: "2025/03/24", period: 5, subject: "物理", grade: "3年", className: "Z組" },
-    // { date: "2025/03/26", period: 6, subject: "物理(補講)", grade: "1年", className: "K組" },
-    // { date: "2025/03/28", period: 1, subject: "物理基礎", grade: "1年", className: "A組" },
-  //   { date: "2025/03/12", period: 6, subject: "物理", grade: "1年", className: "A組" },
-  // ];
-
-  // Map: "yyyy/MM/dd" => [6個], period-1 の位置に { subject, grade, className } or null
   /**
    * ────────────────
    * ①  カレンダーAPI取得
@@ -131,6 +106,10 @@ export default function RealtimeDashboardCalendarPage() {
   const [scheduleEntries, setScheduleEntries] = useState<LessonCalendarEntry[]>([]);
 
   useEffect(() => {
+    if (!apiBaseUrl) {
+      console.error("APIのベースURLが設定されていません。");
+      return;
+    }
     (async () => {
       try {
         const res = await fetch(
@@ -143,7 +122,7 @@ export default function RealtimeDashboardCalendarPage() {
         console.error(e);
       }
     })();
-  }, []);
+  }, [apiBaseUrl]);
 
   /**
    * ────────────────

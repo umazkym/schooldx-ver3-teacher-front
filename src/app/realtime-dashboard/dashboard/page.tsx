@@ -87,9 +87,9 @@ function DashboardPageContent() {
   /** Socket.IO 接続 **/
   const socketRef = useRef<Socket | null>(null);
   useEffect(() => {
-    if (!socketRef.current) {
+    if (!socketRef.current && apiBaseUrl) {
       socketRef.current = io(
-        `${apiBaseUrl}`,
+        apiBaseUrl,
         {
           transports: ["websocket"],
           withCredentials: true,
@@ -110,7 +110,7 @@ function DashboardPageContent() {
             socketRef.current = null;
         }
     };
-  }, []);
+  }, [apiBaseUrl]);
 
   const searchParams = useSearchParams();
   const lessonIdStr = searchParams.get("lesson_id");
@@ -142,7 +142,7 @@ function DashboardPageContent() {
   }, []);
 
   useEffect(() => {
-    if (!lessonId) return;
+    if (!lessonId || !apiBaseUrl) return;
     (async () => {
       try {
         const res = await fetch(
@@ -153,7 +153,7 @@ function DashboardPageContent() {
         setLessonInfo(d);
       } catch {}
     })();
-  }, [lessonId]);
+  }, [lessonId, apiBaseUrl]);
 
   const srcDate = lessonInfo ?? lessonMeta;
   const dateInfoQuery = srcDate
@@ -217,6 +217,10 @@ function DashboardPageContent() {
     const themeId = selectedContent?.lesson_theme_id ?? firstTheme?.lesson_theme_id;
     if (themeId == null) {
       alert("lesson_theme_id が取得できません。");
+      return;
+    }
+    if (!apiBaseUrl) {
+      alert("APIのベースURLが設定されていません。");
       return;
     }
 
@@ -311,7 +315,7 @@ function DashboardPageContent() {
   }, [defaultMinutes]);
 
   const fetchAllStudentsData = useCallback(async () => {
-    if (!lessonId) return;
+    if (!lessonId || !apiBaseUrl) return;
     const currentStudents = studentsRef.current;
     const studentIds = currentStudents.map(s => s.id);
 
@@ -350,11 +354,9 @@ function DashboardPageContent() {
               const progressKey = keys.progress;
               
               const newProgress = calcProgress(answer);
-              // [修正点] 型が正しく推論されるため `as number` が不要に
               const currentProgress = student[progressKey];
 
               if (answer.answer_status !== 1 || newProgress >= currentProgress) {
-                // この行でエラーが発生していた
                 studentUpdate[progressKey] = newProgress;
               }
               studentUpdate[statusKey] = calcIcon(answer);
@@ -363,7 +365,7 @@ function DashboardPageContent() {
         return { ...student, ...studentUpdate };
       })
     );
-  }, [lessonId, calcIcon, calcProgress]);
+  }, [lessonId, apiBaseUrl, calcIcon, calcProgress]);
 
   // 5秒ごとのAPIポーリング (データの同期)
   useEffect(() => {
@@ -389,13 +391,11 @@ function DashboardPageContent() {
             const progressKey = keyInfo.progress;
 
             if (student[statusKey] === 'pencil') {
-              // [修正点] 型が正しく推論されるため `as number` が不要に
               const currentProgress = student[progressKey];
               const increment = 100 / (defaultMinutes * 60);
               const newProgress = Math.min(100, currentProgress + increment);
               
               if (currentProgress !== newProgress) {
-                // この行でも同様のエラーが発生する可能性があった
                 studentUpdate[progressKey] = newProgress;
               }
             }

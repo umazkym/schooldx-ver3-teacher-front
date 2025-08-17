@@ -1,7 +1,7 @@
 "use client"
 export const dynamic = "force-dynamic";
 
-import React, { useState, useEffect, Suspense } from "react"
+import React, { useState, useEffect, Suspense, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 
 /**
@@ -65,12 +65,12 @@ function SettingPageContent() {
     },
   ])
 
-  useEffect(() => {
-    fetchAllLessonData()
-  }, [])
-
   // /lesson_registrations/all
-  async function fetchAllLessonData() {
+  const fetchAllLessonData = useCallback(async () => {
+    if (!apiBaseUrl) {
+      console.error("APIのベースURLが設定されていません。");
+      return;
+    }
     try {
       const res = await fetch(
         `${apiBaseUrl}/lesson_registrations/all`,
@@ -87,7 +87,11 @@ function SettingPageContent() {
     } catch (err) {
       console.error(err)
     }
-  }
+  }, [apiBaseUrl]);
+
+  useEffect(() => {
+    fetchAllLessonData()
+  }, [fetchAllLessonData]);
 
   // +ボタンで行を追加
   function addRow() {

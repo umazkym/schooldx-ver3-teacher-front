@@ -60,7 +60,7 @@ interface LessonInformation {
   }, []);
 
   useEffect(() => {
-    if (!lessonId) return;
+    if (!lessonId || !apiBaseUrl) return;
     (async () => {
       try {
         const res = await fetch(
@@ -71,7 +71,7 @@ interface LessonInformation {
         setLessonInfo(d);
       } catch {}
     })();
-  }, [lessonId]);
+  }, [lessonId, apiBaseUrl]);
 
   const dateSrc = lessonInfo ?? lessonMeta;      // ← どちらかあれば OK
   const dateInfo = dateSrc

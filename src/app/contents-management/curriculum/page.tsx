@@ -8,14 +8,14 @@ import { AiFillFolder } from "react-icons/ai"
  * 1. 左側の階層は /content/by_id/1 で取得したデータを反映 (part_name, chapter_name, unit_name)
  * 2. 左で選択したユニットを、右上の階層表示 (part_name > chapter_name > unit_name) に反映
  * 3. 右側のテーブルは、選択したユニットの lesson_themes を行として表示
- *    - テーマ列 => lesson_theme_name
- *    - 講義動画 => /lecture_videos を参照し、あれば「登録済」、なければ「未登録」
- *      - 登録済なら「表示」ボタンと「削除」ボタン
- *      - 未登録ならファイル選択ボタン (POST /lecture_videos)
- *    - テキスト・参考資料・演習問題は全て「登録済」で固定
+ * - テーマ列 => lesson_theme_name
+ * - 講義動画 => /lecture_videos を参照し、あれば「登録済」、なければ「未登録」
+ * - 登録済なら「表示」ボタンと「削除」ボタン
+ * - 未登録ならファイル選択ボタン (POST /lecture_videos)
+ * - テキスト・参考資料・演習問題は全て「登録済」で固定
  * 4. 講義動画の削除 => DELETE /lecture_videos/{lecture_video_id}
  * 5. 講義動画のアップロード => POST /lecture_videos (multipart/form-data)
- *    - 既に登録済みなら400エラー→「削除してから再登録して下さい」メッセージなど
+ * - 既に登録済みなら400エラー→「削除してから再登録して下さい」メッセージなど
  */
 
 type LessonThemeFromContent = {
@@ -40,8 +40,7 @@ type LectureVideo = {
   video_url: string
 }
 
-/** 
- * 階層表示用: part -> chapter -> units[]
+/** * 階層表示用: part -> chapter -> units[]
  */
 type ChapterGroup = {
   chapter_name: string
@@ -76,6 +75,10 @@ export default function CurriculumPage() {
   // 初期Fetch
   // =========================
   const fetchAllData = useCallback(async () => {
+    if (!apiBaseUrl) {
+      setError("APIのベースURLが設定されていません。");
+      return;
+    }
     setError("")
     try {
       // 1) /content/by_id/1 (GET)
@@ -132,7 +135,7 @@ export default function CurriculumPage() {
       console.error(err)
       setError(err instanceof Error ? err.message : String(err))
     }
-  }, [])
+  }, [apiBaseUrl]);
 
   useEffect(() => {
     fetchAllData()
@@ -184,6 +187,10 @@ export default function CurriculumPage() {
   // 動画アップロード (POST)
   // =========================
   async function handleUploadVideo(themeId: number, file: File) {
+    if (!apiBaseUrl) {
+      alert("APIのベースURLが設定されていません。");
+      return;
+    }
     try {
       setError("")
       setUploading(true)
@@ -219,6 +226,10 @@ export default function CurriculumPage() {
   // 動画削除 (DELETE)
   // =========================
   async function handleDeleteVideo(video: LectureVideo) {
+    if (!apiBaseUrl) {
+      alert("APIのベースURLが設定されていません。");
+      return;
+    }
     try {
       setError("")
       setDeleting(true)
