@@ -62,4 +62,4 @@ jobs:
           app-name: 'tech0-schooldx-dev-appservice-node3'
           slot-name: 'Production'
           package: ./deploy
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_F3620F85C1A04E639C0C1F72E67719B6 }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_NODE3 }}
