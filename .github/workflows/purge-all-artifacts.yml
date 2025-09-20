@@ -1,0 +1,16 @@
+name: Purge All Artifacts (Temporary)
+
+on:
+  workflow_dispatch:
+    # このワークフローをActionsタブから手動で実行できるようにします
+
+jobs:
+  delete-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Purge all artifacts
+        uses: kolpav/purge-artifacts-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # 0 を指定すると、すべてのアーティファクトが即時削除されます
+          expire-in: 0
