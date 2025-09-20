@@ -22,3 +22,58 @@ body {
   background: var(--background);
   font-family: 'Roboto', sans-serif;
 }
+
+.dot-plot-container {
+    position: relative;
+    height: 5.5rem;
+    margin-top: 0.25rem;
+}
+.dot-container {
+    position: absolute;
+    bottom: 1.5rem;
+    left: 0;
+    right: 0;
+    height: 3rem;
+}
+.dot {
+    position: absolute;
+    bottom: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    transform: translateX(-50%);
+}
+.dot-stack-2 { bottom: 9px; }
+.dot-stack-3 { bottom: 18px; }
+.dot-stack-4 { bottom: 27px; }
+.dot-stack-5 { bottom: 36px; }
+
+.axis-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1.5rem;
+}
+.axis-line {
+    position: absolute;
+    bottom: 1rem;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background-color: #cbd5e1;
+}
+.axis-label {
+    position: absolute;
+    bottom: -4px;
+    font-size: 0.75rem;
+    color: #64748b;
+    transform: translateX(-50%);
+}
+.avg-marker {
+    position: absolute;
+    bottom: 1rem;
+    width: 14px;
+    height: 14px;
+    transform: translate(-50%, 50%); /* 中央に配置 */
+}

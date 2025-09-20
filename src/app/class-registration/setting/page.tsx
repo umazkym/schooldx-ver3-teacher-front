@@ -1,23 +1,13 @@
 "use client"
 export const dynamic = "force-dynamic";
-
 import React, { useState, useEffect, Suspense, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
-
-/**
- * 要件:
- * 1) No.1 行のみ初期表示 (+ボタンで行追加)
- * 2) 教科書: material_name, 編: part_name, 章: chapter_name, 単元: unit_name, テーマ: lesson_theme_name をそれぞれプルダウン
- * 3) 学習コンテンツ登録状況: "講義動画が登録されていません"
- * 4) 登録完了 => /lesson_registrations POST (class_id=1, timetable_id=xx, lesson_theme_ids=[xx, yy, ...])
- * - timetable_idはクエリパラメータから
- * - lesson_theme_idsはプルダウンで選んだテーマのID配列
- */
 
 type Material = {
   material_id: number
   material_name: string
 }
+
 type UnitData = {
   units_id: number
   unit_name: string
@@ -25,13 +15,19 @@ type UnitData = {
   part_name: string
   chapter_name: string
 }
+
 type LessonTheme = {
   units_id: number
   lesson_theme_name: string
   lesson_theme_id: number
 }
 
-/** テーブル1行分 */
+type ClassData = {
+  class_id: number
+  class_name: string
+  grade: number
+}
+
 interface RowData {
   no: number
   selectedMaterialId: number | null
@@ -52,6 +48,8 @@ function SettingPageContent() {
   const [materials, setMaterials] = useState<Material[]>([])
   const [units, setUnits] = useState<UnitData[]>([])
   const [lessonThemes, setLessonThemes] = useState<LessonTheme[]>([])
+  const [classes, setClasses] = useState<ClassData[]>([])
+  const [selectedClassId, setSelectedClassId] = useState<number | null>(null)
 
   // テーブル行
   const [rows, setRows] = useState<RowData[]>([
@@ -64,6 +62,29 @@ function SettingPageContent() {
       selectedThemeId: null,
     },
   ])
+
+  // クラス一覧を取得
+  const fetchClasses = useCallback(async () => {
+    if (!apiBaseUrl) {
+      console.error("APIのベースURLが設定されていません。");
+      return;
+    }
+    try {
+      const res = await fetch(`${apiBaseUrl}/classes`, { method: "GET" })
+      if (!res.ok) {
+        console.error("Failed to fetch classes")
+        return
+      }
+      const data = await res.json()
+      setClasses(data || [])
+      // デフォルトで最初のクラスを選択
+      if (data && data.length > 0) {
+        setSelectedClassId(data[0].class_id)
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }, [apiBaseUrl]);
 
   // /lesson_registrations/all
   const fetchAllLessonData = useCallback(async () => {
@@ -90,8 +111,9 @@ function SettingPageContent() {
   }, [apiBaseUrl]);
 
   useEffect(() => {
+    fetchClasses()
     fetchAllLessonData()
-  }, [fetchAllLessonData]);
+  }, [fetchClasses, fetchAllLessonData]);
 
   // +ボタンで行を追加
   function addRow() {
@@ -118,7 +140,6 @@ function SettingPageContent() {
       newRows[rowIndex] = {
         ...newRows[rowIndex],
         selectedMaterialId: matId,
-        // 変更したら、それ以降を初期化
         selectedPartName: "",
         selectedChapterName: "",
         selectedUnitName: "",
@@ -184,22 +205,22 @@ function SettingPageContent() {
       alert("timetable_idがありません。");
       return;
     }
-
+    if (!selectedClassId) {
+      alert("クラスを選択してください。");
+      return;
+    }
     const themeIds = rows
       .map((row) => row.selectedThemeId)
       .filter((id): id is number => id !== null && id > 0);
-
     if (themeIds.length === 0) {
       alert("登録するテーマを1つ以上選択してください。");
       return;
     }
-
     const payload = {
-      class_id: 1, // 仮
+      class_id: selectedClassId,  // ユーザーが選択したクラスID
       timetable_id: timetableId,
       lesson_theme_ids: themeIds,
     };
-
     try {
       const res = await fetch(`${apiBaseUrl}/lesson_registrations/`, {
         method: "POST",
@@ -208,21 +229,17 @@ function SettingPageContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
       if (!res.ok) {
         const msg = await res.text();
         throw new Error(`Register Lesson failed: ${res.status}, ${msg}`);
       }
-
       await res.json();
       alert("登録完了しました");
-      // 登録成功後の画面遷移など（例: router.push('/class-registration');）
     } catch (error) {
       console.error(error);
       alert(`登録失敗: ${String(error)}`);
     }
   }
-
 
   // 選択肢生成用のユーティリティ
   function getPartNamesForRow(row: RowData) {
@@ -231,6 +248,7 @@ function SettingPageContent() {
     const uniqueParts = Array.from(new Set(filtered.map((f) => f.part_name)))
     return uniqueParts
   }
+
   function getChapterNamesForRow(row: RowData) {
     if (row.selectedMaterialId == null || !row.selectedPartName) return []
     const filtered = units.filter(
@@ -240,6 +258,7 @@ function SettingPageContent() {
     const uniqueChapters = Array.from(new Set(filtered.map((f) => f.chapter_name)))
     return uniqueChapters
   }
+
   function getUnitNamesForRow(row: RowData) {
     if (
       row.selectedMaterialId == null ||
@@ -256,6 +275,7 @@ function SettingPageContent() {
     const uniqueUnits = Array.from(new Set(filtered.map((f) => f.unit_name)))
     return uniqueUnits
   }
+
   function getThemesForRow(row: RowData) {
     if (
       row.selectedMaterialId == null ||
@@ -285,7 +305,23 @@ function SettingPageContent() {
             &lt; 戻る
           </button>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-4 items-center">
+          {/* クラス選択ドロップダウンを追加 */}
+          <div>
+            <label className="text-sm mr-2">クラス:</label>
+            <select
+              className="border border-gray-300 rounded px-2 py-1"
+              value={selectedClassId ?? ""}
+              onChange={(e) => setSelectedClassId(parseInt(e.target.value, 10) || null)}
+            >
+              <option value="">選択してください</option>
+              {classes.map((c) => (
+                <option key={c.class_id} value={c.class_id}>
+                  {c.class_name}
+                </option>
+              ))}
+            </select>
+          </div>
           <button className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
             一時保存
           </button>

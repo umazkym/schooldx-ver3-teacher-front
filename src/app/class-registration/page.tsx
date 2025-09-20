@@ -3,34 +3,45 @@ import React, { useState, useEffect, useMemo } from "react"
 import { addMonths, subMonths, format, getDay } from "date-fns"
 import { useRouter } from "next/navigation"
 
+// クラスごとの色定義
+const classColors = [
+  { td: 'bg-blue-50', button: 'bg-blue-100', text: 'text-blue-800', hover: 'hover:bg-blue-200' },
+  { td: 'bg-green-50', button: 'bg-green-100', text: 'text-green-800', hover: 'hover:bg-green-200' },
+  { td: 'bg-yellow-50', button: 'bg-yellow-100', text: 'text-yellow-800', hover: 'hover:bg-yellow-200' },
+  { td: 'bg-purple-50', button: 'bg-purple-100', text: 'text-purple-800', hover: 'hover:bg-purple-200' },
+  { td: 'bg-pink-50', button: 'bg-pink-100', text: 'text-pink-800', hover: 'hover:bg-pink-200' },
+  { td: 'bg-indigo-50', button: 'bg-indigo-100', text: 'text-indigo-800', hover: 'hover:bg-indigo-200' },
+];
+
+const getClassColors = (classId: number | null) => {
+    if (classId === null) {
+        return { td: 'bg-white', button: 'hover:bg-gray-100', text: 'text-gray-400', hover: '' };
+    }
+    return classColors[classId % classColors.length];
+};
+
 /**
  * 授業登録ページ
- * - 右側の時間割にダミー配置
- * - ユーザーが時間割をクリックすると { date, day_of_week, period, time } を
- * /lesson_registrations/calendar へPOST → timetable_idを取得 → settingページへ移動
  */
 export default function ClassRegistrationPage() {
   const router = useRouter()
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-  // --- ▼ Hooks呼び出しをコンポーネントのトップレベルに移動 ▼ ---
   const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [scheduleEntries, setScheduleEntries] = useState<LessonCalendarEntry[]>([]);
   const today = useMemo(() => new Date(), []);
   
-  // ────────────────
-  // ①  カレンダーAPI取得
-  // ────────────────
   interface LessonCalendarEntry {
     timetable_id: number
-    date: string        // "2025-03-12"
-    day_of_week: string // "水"
+    date: string
+    day_of_week: string
     period: number
-    time: string        // "14:35-15:30"
+    time: string
     lesson_id: number | null
     class_id: number
+    class_name: string | null;
     lesson_name: string | null
     delivery_status: boolean
     lesson_status: boolean
@@ -53,37 +64,29 @@ export default function ClassRegistrationPage() {
         console.error(e)
       }
     })()
-  }, [apiBaseUrl]); // 依存配列にapiBaseUrlを追加
+  }, [apiBaseUrl]);
 
-  // ────────────────
-  // ②  日付×時限マップ生成
-  // ────────────────
   const scheduleMap = useMemo(() => {
     const map: Record<
       string,
-      Array<{ lessonName: string; classId: number | null } | null>
+      Array<{ lessonName: string; classId: number | null; className: string | null; } | null>
     > = {}
     scheduleEntries.forEach((e) => {
-      const key = e.date.replace(/-/g, "/")      // "yyyy/MM/dd"
+      const key = e.date.replace(/-/g, "/")
       if (!map[key]) map[key] = [null, null, null, null, null, null]
       map[key][e.period - 1] = {
         lessonName: e.lesson_name ?? "物理",
         classId: e.class_id ?? null,
+        className: e.class_name ?? null,
       }
     })
     return map
   }, [scheduleEntries])
 
-  // --- ▲ Hooksの移動ここまで ▲ ---
-  
-  // --- ▼ Hooks呼び出しの後に条件分岐を配置 ▼ ---
   if (!apiBaseUrl) {
-    // 環境変数が読み込めていない場合のエラー処理
     return <div>エラー: APIのベースURLが設定されていません。</div>;
   }
-  // --- ▲ 条件分岐の移動ここまで ▲ ---
 
-  // 前の月に移動
   const handlePrevMonth = () => {
     const base = new Date(currentYear, currentMonth, 1)
     const prev = subMonths(base, 1)
@@ -91,7 +94,6 @@ export default function ClassRegistrationPage() {
     setCurrentMonth(prev.getMonth())
   }
 
-  // 次の月に移動
   const handleNextMonth = () => {
     const base = new Date(currentYear, currentMonth, 1)
     const next = addMonths(base, 1)
@@ -99,7 +101,6 @@ export default function ClassRegistrationPage() {
     setCurrentMonth(next.getMonth())
   }
 
-  // 指定年月の1日～末日をDate配列に
   function getDaysInMonth(year: number, month: number): Date[] {
     const first = new Date(year, month, 1)
     const result: Date[] = []
@@ -111,15 +112,12 @@ export default function ClassRegistrationPage() {
   }
   const daysInThisMonth = getDaysInMonth(currentYear, currentMonth)
 
-  // 日付クリックで selectedDate 更新
   const handleSelectDate = (d: Date) => {
     setSelectedDate(d)
   }
 
-  /** selectedDate を含む週(月曜～金曜) */
   function getWeekDates(date: Date) {
-    // 週開始を月曜に
-    const wd = getDay(date) // 0=日,1=月,...6=土
+    const wd = getDay(date)
     const mondayOffset = wd === 0 ? 6 : wd - 1
     const monday = new Date(date)
     monday.setDate(date.getDate() - mondayOffset)
@@ -134,7 +132,6 @@ export default function ClassRegistrationPage() {
   }
   const weekDates = getWeekDates(selectedDate)
 
-  // 時限データ(2行表示 + time情報)
   const periods = [
     { period: 1, label: "1限\n8:35~9:30", time: "8:35-9:30" },
     { period: 2, label: "2限\n9:40~10:35", time: "9:40-10:35" },
@@ -144,7 +141,6 @@ export default function ClassRegistrationPage() {
     { period: 6, label: "6限\n14:35~15:30", time: "14:35-15:30" },
   ]
   
-  // 曜日取得
   function toJapaneseDayOfWeek(d: Date) {
     const dayNum = d.getDay()
     const JpDays = ["日", "月", "火", "水", "木", "金", "土"]
@@ -155,8 +151,8 @@ export default function ClassRegistrationPage() {
     dateObj: Date,
     periodInfo: { period: number; time: string }
   ) => {
-    const dateStr = format(dateObj, "yyyy-MM-dd") // 例: 2025-03-04
-    const day_of_week = toJapaneseDayOfWeek(dateObj) // "火"など
+    const dateStr = format(dateObj, "yyyy-MM-dd")
+    const day_of_week = toJapaneseDayOfWeek(dateObj)
     const payload = {
       date: dateStr,
       day_of_week,
@@ -178,7 +174,6 @@ export default function ClassRegistrationPage() {
       }
       const data = await res.json()
       const timetableId = data.timetable_id
-      // ページ遷移
       router.push(`/class-registration/setting?tid=${timetableId}`)
     } catch (error) {
       console.error(error)
@@ -188,7 +183,6 @@ export default function ClassRegistrationPage() {
 
   return (
     <div>
-      {/* タイトル行 */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <button onClick={() => history.back()} className="font-bold hover:underline mr-4">
@@ -204,9 +198,7 @@ export default function ClassRegistrationPage() {
       </div>
 
       <div className="flex gap-8">
-        {/* 左側: 月カレンダー */}
         <div>
-          {/* 年月切り替え */}
           <div className="flex items-center justify-between mb-2">
             <button
               onClick={handlePrevMonth}
@@ -225,16 +217,13 @@ export default function ClassRegistrationPage() {
             </button>
           </div>
 
-          {/* カレンダー (7列) */}
           <div className="grid grid-cols-7 gap-2 p-2 border border-gray-300 rounded">
             {daysInThisMonth.map((d) => {
               const dayNum = d.getDate()
-              // "今日" 判定
               const isToday =
                 d.getFullYear() === today.getFullYear() &&
                 d.getMonth() === today.getMonth() &&
                 dayNum === today.getDate()
-              // "選択中" 判定
               const isSelected =
                 d.getFullYear() === selectedDate.getFullYear() &&
                 d.getMonth() === selectedDate.getMonth() &&
@@ -259,7 +248,6 @@ export default function ClassRegistrationPage() {
           </div>
         </div>
 
-        {/* 右側: 選択週(月～金) */}
         <div>
           <div className="overflow-x-auto">
             <table className="table-fixed bg-[#F7F7F7] text-sm">
@@ -285,7 +273,6 @@ export default function ClassRegistrationPage() {
               <tbody>
                 {periods.map((p) => (
                   <tr key={p.period}>
-                    {/* 左列(時限) */}
                     <td
                       className="border-r border-b border-white border-8 p-2 text-center align-middle"
                       style={{ width: 120 }}
@@ -304,7 +291,7 @@ export default function ClassRegistrationPage() {
                         return (
                           <td
                             key={colIdx}
-                            className="border-r border-b border-white border-8 text-center align-middle h-20 hover:bg-blue-50 cursor-pointer"
+                            className="border-r border-b border-white border-8 text-center align-middle h-20 hover:bg-gray-100 cursor-pointer"
                             style={{ width: 120 }}
                             onClick={() => handleClickSchedule(wd, p)}
                           >
@@ -312,20 +299,21 @@ export default function ClassRegistrationPage() {
                           </td>
                         )
                       }
-
+                      
+                      const colors = getClassColors(info.classId);
                       return (
                         <td
                           key={colIdx}
-                          className="border-r border-b border-white border-8 text-center align-middle h-20 bg-[#D7ECFF]"
+                          className={`border-r border-b border-white border-8 text-center align-middle h-20 ${colors.td}`}
                           style={{ width: 120 }}
                         >
                           <button
                             onClick={() => handleClickSchedule(wd, p)}
-                            className="w-full h-full inline-block bg-blue-100 text-blue-700 px-3 py-5 rounded hover:bg-blue-200"
+                            className={`w-full h-full inline-block px-3 py-5 rounded font-semibold ${colors.button} ${colors.text} ${colors.hover}`}
                           >
                             {info.lessonName}
                             <br />
-                            {info.classId !== null ? `class_id=${info.classId}` : ""}
+                            {info.className}
                           </button>
                         </td>
                       )

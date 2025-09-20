@@ -21,6 +21,9 @@ export default function Header() {
     pageTitle = "コンテンツ管理 / 登録"
   } else if (pathname.startsWith("/class-registration")) {
     pageTitle = "授業登録"
+  } else if (pathname.startsWith("/grades")) {
+    // ▼▼▼【修正】「成績表示」ページのタイトルを追加 ▼▼▼
+    pageTitle = "成績表示"
   }
 
   return (

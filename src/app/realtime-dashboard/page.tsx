@@ -4,36 +4,39 @@ import Link from "next/link";
 import { addMonths, subMonths, format, getDay } from "date-fns";
 import { useRouter } from "next/navigation";
 
-/**
- * リアルタイムダッシュボード ＞ カレンダビュー
- * - 「授業登録」と同じUIレイアウトで、左に「月カレンダー」(前の月/次の月ボタン)、
- * 右に「選択週(月~金)」の時間割を表示。
- * - "開始する授業を選択してください" の文言を上に表示。
- * - 時間割クリック時に `/realtime-dashboard/content-selection` へ遷移し、クエリに dateInfo を付与。
- * - ダミーデータ: 2/15 ~ 3/31 にだけ授業がある。
- */
+// クラスごとの色定義
+const classColors = [
+    { td: 'bg-blue-50', button: 'bg-blue-100', text: 'text-blue-800', hover: 'hover:bg-blue-200' },
+    { td: 'bg-green-50', button: 'bg-green-100', text: 'text-green-800', hover: 'hover:bg-green-200' },
+    { td: 'bg-yellow-50', button: 'bg-yellow-100', text: 'text-yellow-800', hover: 'hover:bg-yellow-200' },
+    { td: 'bg-purple-50', button: 'bg-purple-100', text: 'text-purple-800', hover: 'hover:bg-purple-200' },
+    { td: 'bg-pink-50', button: 'bg-pink-100', text: 'text-pink-800', hover: 'hover:bg-pink-200' },
+    { td: 'bg-indigo-50', button: 'bg-indigo-100', text: 'text-indigo-800', hover: 'hover:bg-indigo-200' },
+];
+
+const getClassColors = (classId: number | null) => {
+    if (classId === null) {
+        return { td: 'bg-[#F7F7F7]', button: '', text: '', hover: '' };
+    }
+    return classColors[classId % classColors.length];
+};
 
 export default function RealtimeDashboardCalendarPage() {
   const router = useRouter();
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-  // 今日
   const today = new Date();
-
-  // 月カレンダーの状態
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // 0-based
-  // 選択した日付 (週表示用): 初期値=今日
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [selectedDate, setSelectedDate] = useState<Date>(today);
+  const [scheduleEntries, setScheduleEntries] = useState<LessonCalendarEntry[]>([]);
 
-  // 前の月へ
   const handlePrevMonth = () => {
     const base = new Date(currentYear, currentMonth, 1);
     const prev = subMonths(base, 1);
     setCurrentYear(prev.getFullYear());
     setCurrentMonth(prev.getMonth());
   };
-  // 次の月へ
   const handleNextMonth = () => {
     const base = new Date(currentYear, currentMonth, 1);
     const next = addMonths(base, 1);
@@ -41,7 +44,6 @@ export default function RealtimeDashboardCalendarPage() {
     setCurrentMonth(next.getMonth());
   };
 
-  // 指定年月の1日～末日を列挙
   function getDaysInMonth(year: number, month: number): Date[] {
     const first = new Date(year, month, 1);
     const arr: Date[] = [];
@@ -53,14 +55,12 @@ export default function RealtimeDashboardCalendarPage() {
   }
   const daysInThisMonth = getDaysInMonth(currentYear, currentMonth);
 
-  // 日付クリック => selectedDate を変更
   function handleSelectDate(d: Date) {
     setSelectedDate(d);
   }
 
-  // 選択日の「週」(月曜始まりで5日分)
   function getWeekDates(date: Date) {
-    const wd = getDay(date); // 0=日,1=月,...6=土
+    const wd = getDay(date);
     const mondayOffset = wd === 0 ? 6 : wd - 1;
     const monday = new Date(date);
     monday.setDate(date.getDate() - mondayOffset);
@@ -75,7 +75,6 @@ export default function RealtimeDashboardCalendarPage() {
   }
   const weekDates = getWeekDates(selectedDate);
 
-  // 時限(2行表示: 例 "1限\n8:35~9:30")
   const periods = [
     { period: 1, label: "1限\n8:35~9:30" },
     { period: 2, label: "2限\n9:40~10:35" },
@@ -85,11 +84,6 @@ export default function RealtimeDashboardCalendarPage() {
     { period: 6, label: "6限\n14:35~15:30" },
   ];
 
-  /**
-   * ────────────────
-   * ①  カレンダーAPI取得
-   * ────────────────
-   */
   interface LessonCalendarEntry {
     timetable_id: number;
     date: string;
@@ -98,12 +92,11 @@ export default function RealtimeDashboardCalendarPage() {
     time: string;
     lesson_id: number | null;
     class_id: number;
+    class_name: string | null;
     lesson_name: string | null;
     delivery_status: boolean;
     lesson_status: boolean;
   }
-
-  const [scheduleEntries, setScheduleEntries] = useState<LessonCalendarEntry[]>([]);
 
   useEffect(() => {
     if (!apiBaseUrl) {
@@ -124,18 +117,14 @@ export default function RealtimeDashboardCalendarPage() {
     })();
   }, [apiBaseUrl]);
 
-  /**
-   * ────────────────
-   * ②  日付×時限マップ生成
-   * ────────────────
-   */
   const scheduleMap = useMemo(() => {
     const map: Record<
       string,
       Array<{
         lessonName: string;
         classId: number | null;
-        lessonId: number | null;   // ★ 追加
+        className: string | null;
+        lessonId: number | null;
       } | null>
     > = {};
     scheduleEntries.forEach((e) => {
@@ -144,27 +133,24 @@ export default function RealtimeDashboardCalendarPage() {
       map[key][e.period - 1] = {
         lessonName: e.lesson_name ?? "物理",
         classId: e.class_id ?? null,
-        lessonId: e.lesson_id,          // ← 型に合わせて保持
+        className: e.class_name ?? null,
+        lessonId: e.lesson_id,
       };
     });
     return map;
   }, [scheduleEntries]);
 
-  // 時間割セルをクリック => content-selection へ
-function handleClickSchedule(
-  dateObj: Date,
-  period: number,
-  info: { lessonName: string; classId: number | null; lessonId: number | null }
-) {
-    if (!info.lessonId) return;         // lesson 未登録コマ
-
-    // クリック先ページは lesson_id のみを渡す（他の表示情報は API 側で取得）
+  function handleClickSchedule(
+    dateObj: Date,
+    period: number,
+    info: { lessonName: string; classId: number | null; lessonId: number | null }
+  ) {
+    if (!info.lessonId) return;
     router.push(`/realtime-dashboard/content-selection?lesson_id=${info.lessonId}`);
   }
 
   return (
     <div>
-      {/* タイトル行 */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <Link href="/" className="font-bold hover:underline mr-4">
@@ -180,9 +166,7 @@ function handleClickSchedule(
       </div>
 
       <div className="flex gap-8">
-        {/* 左: 月カレンダー */}
         <div>
-          {/* 年月切り替え */}
           <div className="flex items-center justify-between mb-2">
             <button onClick={handlePrevMonth} className="text-[#5E5E5E] font-bold hover:underline">
               &lt; 前の月
@@ -195,7 +179,6 @@ function handleClickSchedule(
             </button>
           </div>
 
-          {/* カレンダー (7列) */}
           <div className="grid grid-cols-7 gap-2 p-2 border border-gray-300 rounded">
             {daysInThisMonth.map((d) => {
               const dayNum = d.getDate();
@@ -228,7 +211,6 @@ function handleClickSchedule(
           </div>
         </div>
 
-        {/* 右: 選択週(月~金) 時間割 */}
         <div>
           <div className="overflow-x-auto">
             <table className="table-fixed bg-[#F7F7F7] text-sm">
@@ -254,7 +236,6 @@ function handleClickSchedule(
               <tbody>
                 {periods.map((p) => (
                   <tr key={p.period}>
-                    {/* 左列: 時限 */}
                     <td
                       className="border-r border-b border-white border-8 p-2 text-center align-middle"
                       style={{ width: 120 }}
@@ -268,32 +249,31 @@ function handleClickSchedule(
                       const dateKey = format(wd, "yyyy/MM/dd");
                       const arr = scheduleMap[dateKey] || [null, null, null, null, null, null];
                       const info = arr[p.period - 1];
-                      if (!info) {
-                        // 予定なし
+                      if (!info || !info.lessonId) {
                         return (
                           <td
                             key={colIdx}
-                            className="border-r border-b border-white border-8 text-center align-middle h-20 text-gray-400"
-                            style={{ width: 120 }}
+                            className="border-r border-b border-white border-8 text-center align-middle h-20"
+                            style={{ width: 120, backgroundColor: '#F7F7F7' }}
                           >
-                            
                           </td>
                         );
                       }
-                      // 授業あり => ボタン
+                      
+                      const colors = getClassColors(info.classId);
                       return (
                         <td
                           key={colIdx}
-                          className="border-r border-b border-white border-8 text-center align-middle h-20 bg-[#D7ECFF]"
+                          className={`border-r border-b border-white border-8 text-center align-middle h-20 ${colors.td}`}
                           style={{ width: 120 }}
                         >
                           <button
                             onClick={() => handleClickSchedule(wd, p.period, info)}
-                            className="w-full h-full inline-block bg-blue-100 text-blue-700 px-3 py-5 rounded hover:bg-blue-200"
+                            className={`w-full h-full inline-block px-3 py-5 rounded font-semibold ${colors.button} ${colors.text} ${colors.hover}`}
                           >
                             {info.lessonName}
                             <br />
-                            {info.classId !== null ? `class_id=${info.classId}` : ""}
+                            {info.className}
                           </button>
                         </td>
                       );

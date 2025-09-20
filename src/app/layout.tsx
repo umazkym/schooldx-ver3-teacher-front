@@ -8,12 +8,6 @@ export const metadata = {
   description: 'School management UI sample',
 }
 
-/**
- * すべてのページをラップするルートレイアウト
- * - ヘッダーを上部
- * - サイドバーを左
- * - メインコンテンツを右
- */
 export default function RootLayout({
   children,
 }: {
@@ -24,10 +18,7 @@ export default function RootLayout({
       <body className="flex flex-col min-h-screen">
         {/* ヘッダー: ページタイトル＋校章 */}
         <Header />
-
-        {/* ページごとのメインレイアウト */}
         <div className="flex flex-1">
-          {/* サイドバー: ページパスに応じて動的にメニューを出し分け */}
           <Sidebar />
 
           <main className="flex-1 p-6 bg-white overflow-auto">
