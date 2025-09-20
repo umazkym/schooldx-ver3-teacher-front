@@ -1,0 +1,19 @@
+name: Cleanup Old Artifacts
+
+on:
+  schedule:
+    # 毎週日曜日の午前3時 (UTC) に実行します
+    # 実行頻度は必要に応じて変更してください
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+    # Actionsタブから手動でも実行できるようにします
+
+jobs:
+  delete-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old artifacts
+        uses: actions/delete-artifact@v5
+        with:
+          # 作成から7日以上経過したアーティファクトを削除します
+          expired-in-days: 7
