@@ -4,14 +4,23 @@ import { useRouter } from "next/navigation"
 
 // --- 型定義 ---
 type ClassData = { class_id: number; class_name: string; grade: number; };
-// ▼▼▼ 修正 ▼▼▼ APIレスポンスの型を定義
-type LessonForGradePage = {
-    lesson_id: number;
-    lesson_name: string;
+type LessonData = { lesson_id: number; lesson_name: string; date: string; period: number; };
+
+// ▼▼▼【修正】APIレスポンスの型を定義 ▼▼▼
+type LessonCalendarItem = {
+    timetable_id: number;
     date: string;
+    day_of_week: string;
     period: number;
+    time: string;
+    lesson_id: number | null;
+    class_id: number | null;
+    class_name: string | null;
+    lesson_name: string | null;
+    delivery_status: boolean;
+    lesson_status: boolean;
 };
-// ▲▲▲ 修正 ▲▲▲
+// ▲▲▲【修正】ここまで ▲▲▲
 
 type RawDataItem = {
     student: { student_id: number; name: string; class_id: number; };
@@ -53,8 +62,8 @@ type QuestionStats = {
 };
 
 /**
- * @returns {number} 現在の年度 (例: 2025)
- */
+ * @returns {number} 現在の年度 (例: 2025)
+ */
 const getCurrentAcademicYear = (): number => {
     const today = new Date();
     // 1月, 2月, 3月 (0, 1, 2) の場合は、前年の西暦が年度となる
@@ -68,7 +77,7 @@ export default function GradesPage() {
     // --- State管理 ---
     const [classes, setClasses] = useState<ClassData[]>([]);
     const [selectedClassId, setSelectedClassId] = useState<string>("");
-    const [lessons, setLessons] = useState<LessonForGradePage[]>([]); // 修正: 型を適用
+    const [lessons, setLessons] = useState<LessonData[]>([]);
     const [selectedLessonId, setSelectedLessonId] = useState<string>("");
     const [rawData, setRawData] = useState<RawDataItem[]>([]);
     const [comments, setComments] = useState<CommentData[]>([]);
@@ -115,15 +124,19 @@ export default function GradesPage() {
             try {
                 const res = await fetch(`${apiBaseUrl}/lesson_registrations/calendar?academic_year=${selectedAcademicYear}&class_id=${selectedClassId}`);
                 if (!res.ok) throw new Error("授業一覧の取得に失敗しました");
-                // ▼▼▼ 修正 ▼▼▼ anyを具体的な型に置き換え
-                const data = (await res.json()).filter((item: { lesson_id: number | null }) => item.lesson_id != null);
-                setLessons(data.map((item: { lesson_id: number, lesson_name: string, date: string, period: number }) => ({
+                
+                // ▼▼▼【修正】any型を排除し、厳密な型チェックを導入 ▼▼▼
+                const data: LessonCalendarItem[] = await res.json();
+                const filteredData = data.filter((item): item is LessonCalendarItem & { lesson_id: number } => item.lesson_id != null);
+                
+                setLessons(filteredData.map((item) => ({
                     lesson_id: item.lesson_id,
                     lesson_name: item.lesson_name || "物理",
                     date: item.date,
                     period: item.period
                 })));
-                // ▲▲▲ 修正 ▲▲▲
+                // ▲▲▲【修正】ここまで ▲▲▲
+
                 // 授業リストが更新されたら、選択中の授業をリセット
                 setSelectedLessonId("");
             } catch (error) {
@@ -484,10 +497,10 @@ const DotPlot = ({ title, times, color, avgTime }: { title: string, times: numbe
                         const position = (Number(time) / maxTime) * 100;
                         return Array.from({ length: count }).map((_, i) => (
                              <span
-                                 key={`${time}-${i}`}
-                                 className={`dot ${color === 'green' ? 'bg-green-400' : 'bg-gray-400'} ${i > 0 ? `dot-stack-${i + 1}` : ''}`}
-                                 style={{ left: `${position}%` }}
-                                 title={`${time}秒`}
+                                key={`${time}-${i}`}
+                                className={`dot ${color === 'green' ? 'bg-green-400' : 'bg-gray-400'} ${i > 0 ? `dot-stack-${i + 1}` : ''}`}
+                                style={{ left: `${position}%` }}
+                                title={`${time}秒`}
                             ></span>
                         ));
                     })}

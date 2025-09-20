@@ -21,8 +21,9 @@ export default function Sidebar() {
   const isContentSelection = pathname.startsWith('/realtime-dashboard/content-selection')
   const isDashboard = pathname.startsWith('/realtime-dashboard/dashboard')
   
-  // 新たに: /class-registration の場合にコンテンツ管理ボタンを追加
-  const isClassRegistration = pathname.startsWith('/class-registration/final')
+  // ▼▼▼【修正】/class-registration/ 以下の全てのパスで一致するように変更 ▼▼▼
+  const isClassRegistration = pathname.startsWith('/class-registration')
+  // ▲▲▲【修正】ここまで ▲▲▲
 
   // 1) 常にホームボタン
   const menus: { label: string; href: string; icon: React.ReactNode }[] = [

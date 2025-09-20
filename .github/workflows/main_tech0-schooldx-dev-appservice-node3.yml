@@ -49,9 +49,7 @@ jobs:
         with:
           name: node-app
           path: release.zip # zipファイルのみをアップロード
-          # ▼▼▼ 修正 ▼▼▼ アーティファクトの保持期間を7日に設定
-          retention-days: 7
-          # ▲▲▲ 修正 ▲▲▲
+          retention-days: 7 # ▼▼▼【修正】7日後にアーティファクトを自動削除 ▼▼▼
 
   deploy:
     runs-on: ubuntu-latest
