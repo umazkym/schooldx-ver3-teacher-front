@@ -1,7 +1,9 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
+import { getSocket, disconnectSocket } from "@/lib/socket";
+import { Socket } from "socket.io-client";
 
 export default function ContentSelectionComponent() {
   const router = useRouter();
@@ -10,8 +12,8 @@ export default function ContentSelectionComponent() {
   const lessonIdStr = searchParams.get("lesson_id");
   const lessonId   = lessonIdStr ? Number(lessonIdStr) : null;
 
-  /** ───────── API 型定義 ───────── */
-  // 授業テーマの型
+  const socketRef = useRef<Socket | null>(null);
+
   interface LessonThemeBlock {
     lesson_registration_id: number;
     lesson_theme_id: number;
@@ -27,7 +29,6 @@ export default function ContentSelectionComponent() {
     material_name: string;
   }
 
-  // APIレスポンス全体の型
   interface LessonApiResponse {
     class_id: number;
     timetable_id: number;
@@ -41,7 +42,6 @@ export default function ContentSelectionComponent() {
     lesson_theme: LessonThemeBlock[];
   }
 
-  // テーブル表示用の行データ型
   type ContentRow = {
     id: number;
     no: string;
@@ -57,6 +57,31 @@ export default function ContentSelectionComponent() {
   const [contents,   setContents]   = useState<ContentRow[]>([]);
   const [loading,    setLoading]    = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [isLessonStarted, setIsLessonStarted] = useState(false);
+  const [isEnding, setIsEnding] = useState(false);
+
+  useEffect(() => {
+    const socket = getSocket();
+    socketRef.current = socket;
+
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    socket.on("connect", () => {
+      console.log("🌐 WebSocket connected (ContentSelection)");
+    });
+
+    socket.on("from_flutter", (data) => {
+      console.log("🌐 Received from Flutter:", data);
+    });
+
+    return () => {
+      console.log("🌐 Cleaning up ContentSelection component. Disconnecting socket.");
+      disconnectSocket();
+      socketRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (!lessonId || !apiBaseUrl) return;
@@ -67,9 +92,13 @@ export default function ContentSelectionComponent() {
           `${apiBaseUrl}/lesson_attendance/lesson_information?lesson_id=${lessonId}`
         );
         if (!res.ok) throw new Error(`GET lesson_information failed: ${res.status}`);
-
         const data = (await res.json()) as LessonApiResponse;
         setLessonInfo(data);
+        
+        // ▼▼▼▼▼ 修正点 ▼▼▼▼▼
+        // APIから取得した授業ステータスをUIに反映する
+        setIsLessonStarted(data.lesson_status);
+        // ▲▲▲▲▲ 修正点 ▲▲▲▲▲
 
         const themes = data.lesson_theme || [];
         setContents(
@@ -81,7 +110,7 @@ export default function ContentSelectionComponent() {
             chapter:  t.chapter_name  ?? "",
             unit:     t.unit_name     ?? "",
             theme:    t.lesson_theme_name,
-            time:     "–",
+            time:     "5",
           }))
         );
       } catch (err) {
@@ -93,10 +122,6 @@ export default function ContentSelectionComponent() {
   }, [lessonId, apiBaseUrl]);
 
   const handleStartLesson = async () => {
-    if (!contents || contents.length === 0) {
-      alert("開始するコンテンツがありません。");
-      return;
-    }
     if (!lessonId) {
       alert("lesson_id が見つかりません。");
       return;
@@ -107,40 +132,113 @@ export default function ContentSelectionComponent() {
     }
 
     setIsStarting(true);
-    const successThemes: string[] = [];
-    const errorThemes: string[] = [];
 
-    await Promise.all(
-      contents.map(async (content) => {
-        try {
-          const res = await fetch(`${apiBaseUrl}/api/answer-data-bulk/lessons/${lessonId}/themes/${content.id}/generate-answer-data`, {
-            method: "POST",
-          });
-          if (!res.ok) {
-            const errorData = await res.json().catch(() => ({ detail: res.statusText }));
-            throw new Error(errorData.detail || `HTTP error ${res.status}`);
-          }
-          await res.json();
-          successThemes.push(content.theme);
-        } catch (err) {
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          errorThemes.push(`「${content.theme}」（${errorMessage}）`);
-        }
-      })
-    );
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/lessons/${lessonId}/start`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
-    let alertMessage = "";
-    if (successThemes.length > 0) {
-        alertMessage += `${successThemes.length}個のテーマで授業を開始しました。\n`;
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(errorData.message || `HTTP error ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      if (socketRef.current) {
+        const message = `lesson_start,${lessonId}`;
+        socketRef.current.emit("to_flutter", message);
+        console.log("🌐 Sent to server:", message);
+      }
+
+      alert(data.message || "授業を開始しました。");
+      setIsLessonStarted(true);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      alert(`授業開始に失敗しました: ${errorMessage}`);
+      console.error(err);
+    } finally {
+      setIsStarting(false);
     }
-    if (errorThemes.length > 0) {
-        alertMessage += `\n以下のテーマでエラーが発生しました:\n${errorThemes.join("\n")}\n\n※テーマに問題が登録されていない可能性があります。`;
-    }
-    alert(alertMessage || "処理が完了しましたが、予期せぬ状態です。");
-
-    setIsStarting(false);
   };
 
+  const handleEndLesson = async () => {
+    if (!lessonId) {
+      alert("lesson_id が見つかりません。");
+      return;
+    }
+    if (!apiBaseUrl) {
+      alert("APIのベースURLが設定されていません。");
+      return;
+    }
+
+    setIsEnding(true);
+
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/lessons/${lessonId}/end`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(errorData.message || `HTTP error ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      if (socketRef.current) {
+        const message = `lesson_end,${lessonId}`;
+        socketRef.current.emit("to_flutter", message);
+        console.log("🌐 Sent to server:", message);
+      }
+
+      alert(data.message || "授業を終了しました。");
+      setIsLessonStarted(false);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      alert(`授業終了に失敗しました: ${errorMessage}`);
+      console.error(err);
+    } finally {
+      setIsEnding(false);
+    }
+  };
+
+  const handleNavigateToDashboard = (c: ContentRow) => {
+    sessionStorage.setItem(
+      "selectedContentInfo",
+      JSON.stringify({
+        lesson_theme_id:   c.id,
+        lesson_theme_name: c.theme,
+        material_name:     c.textbook,
+        part_name:         c.hen,
+        chapter_name:      c.chapter,
+        unit_name:         c.unit,
+      })
+    );
+    if (lessonInfo) {
+      sessionStorage.setItem(
+        "selectedLessonMeta",
+        JSON.stringify({
+          date:        lessonInfo.date,
+          day_of_week: lessonInfo.day_of_week,
+          period:      lessonInfo.period,
+          lesson_name: lessonInfo.lesson_name,
+        })
+      );
+    }
+    
+    const q = new URLSearchParams({
+      timer:     c.time,
+      lesson_id: lessonIdStr ?? "",
+    });
+    router.push(`/realtime-dashboard/dashboard?${q.toString()}`);
+  };
 
   if (!lessonId)          return <p>lesson_id がありません。</p>;
   if (loading || !lessonInfo) return <p>Loading...</p>;
@@ -151,7 +249,6 @@ export default function ContentSelectionComponent() {
 
   return (
     <div>
-      {/* タイトル行 */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <Link href="/realtime-dashboard" className="font-bold hover:underline mr-4">
@@ -167,27 +264,29 @@ export default function ContentSelectionComponent() {
         </div>
       </div>
 
-      {/* 日付/時限/クラス等 */}
       <div className="text-gray-600 mb-4">{dateInfoQuery}</div>
 
-      {/* ボタン類 */}
       <div className="flex justify-end gap-2 mb-4">
-        <button className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">
-          予習配信
-        </button>
         <button
-          className={`bg-blue-500 text-white px-3 py-1 rounded ${isStarting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
+          className={`bg-blue-500 text-white px-3 py-1 rounded ${
+            isStarting || isLessonStarted ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'
+          }`}
           onClick={handleStartLesson}
-          disabled={isStarting}
+          disabled={isStarting || isLessonStarted}
         >
-          {isStarting ? "開始処理中..." : "授業開始"}
+          {isStarting ? "開始処理中..." : (isLessonStarted ? "授業開始済み" : "授業開始")}
         </button>
-        <button className="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600">
-          授業終了
+        <button 
+          className={`bg-gray-500 text-white px-3 py-1 rounded ${
+            isEnding || !isLessonStarted ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
+          }`}
+          onClick={handleEndLesson}
+          disabled={isEnding || !isLessonStarted}
+        >
+          {isEnding ? "終了処理中..." : "授業終了"}
         </button>
       </div>
 
-      {/* テーブル */}
       <div className="overflow-x-auto">
         <table className="border border-gray-200 text-sm text-center w-full table-fixed">
           <thead className="bg-gray-100">
@@ -215,35 +314,7 @@ export default function ContentSelectionComponent() {
                 <td className="p-2 border-b border-gray-200">
                   <button
                     className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-                    onClick={() => {
-                      sessionStorage.setItem(
-                        "selectedContentInfo",
-                        JSON.stringify({
-                          lesson_theme_id:   c.id,
-                          lesson_theme_name: c.theme,
-                          material_name:     c.textbook,
-                          part_name:         c.hen,
-                          chapter_name:      c.chapter,
-                          unit_name:         c.unit,
-                        })
-                      );
-                      if (lessonInfo) {
-                        sessionStorage.setItem(
-                          "selectedLessonMeta",
-                          JSON.stringify({
-                            date:        lessonInfo.date,
-                            day_of_week: lessonInfo.day_of_week,
-                            period:      lessonInfo.period,
-                            lesson_name: lessonInfo.lesson_name,
-                          })
-                        );
-                      }
-                      const q = new URLSearchParams({
-                        timer:     c.time,
-                        lesson_id: lessonIdStr ?? "",
-                      });
-                      router.push(`/realtime-dashboard/dashboard?${q.toString()}`);
-                    }}
+                    onClick={() => handleNavigateToDashboard(c)}
                   >
                     ダッシュボードへ
                   </button>

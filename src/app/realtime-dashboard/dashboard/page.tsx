@@ -2,8 +2,9 @@
 export const dynamic = "force-dynamic";
 
 import React, { useState, useEffect, useRef, Suspense, useCallback } from "react";
-import { io, Socket } from "socket.io-client";
 import { useSearchParams, useRouter } from "next/navigation";
+import { Socket } from "socket.io-client";
+import { getSocket } from "@/lib/socket";
 
 /**
  * 型定義
@@ -45,7 +46,6 @@ interface Student {
   q4Progress: number;
 }
 
-// [修正点] Studentインターフェースのキーを、その値の型に応じてより具体的に定義
 type StudentStringKey = { [K in keyof Student]: Student[K] extends string ? K : never }[keyof Student];
 type StudentNumberKey = { [K in keyof Student]: Student[K] extends number ? K : never }[keyof Student];
 
@@ -67,15 +67,12 @@ interface LessonInformation {
   lesson_theme: Record<string, LessonThemeBlock>;
 }
 
-// この画面で扱う固定の問題IDとUIのキーをマッピング
-// [修正点] 型定義をより厳密なものに変更
 const questionIdToKeyMap: { [id: number]: { status: StudentStringKey, progress: StudentNumberKey } } = {
   15: { status: 'q1', progress: 'q1Progress' },
   17: { status: 'q2', progress: 'q2Progress' },
   20: { status: 'q3', progress: 'q3Progress' },
   23: { status: 'q4', progress: 'q4Progress' },
 };
-
 
 /**
  * ダッシュボード主要コンポーネント
@@ -84,33 +81,30 @@ function DashboardPageContent() {
   const router = useRouter();
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-  /** Socket.IO 接続 **/
   const socketRef = useRef<Socket | null>(null);
-  useEffect(() => {
-    if (!socketRef.current && apiBaseUrl) {
-      socketRef.current = io(
-        apiBaseUrl,
-        {
-          transports: ["websocket"],
-          withCredentials: true,
-        },
-      );
 
-      socketRef.current.on("connect", () =>
-        console.log("🌐 Web connected (Dashboard)")
-      );
-      socketRef.current.on("from_flutter", (data) =>
-        console.log("🌐 Web recv from Flutter:", data)
-      );
+  useEffect(() => {
+    const socket = getSocket();
+    socketRef.current = socket;
+
+    if (!socket.connected) {
+      socket.connect();
     }
 
+    socket.on("connect", () =>
+      console.log("🌐 Web connected (Dashboard)")
+    );
+    socket.on("from_flutter", (data) =>
+      console.log("🌐 Web recv from Flutter:", data)
+    );
+
     return () => {
-        if(socketRef.current && socketRef.current.connected) {
-            socketRef.current.disconnect();
-            socketRef.current = null;
+        if (socketRef.current) {
+            socketRef.current.off("connect");
+            socketRef.current.off("from_flutter");
         }
     };
-  }, [apiBaseUrl]);
+  }, []);
 
   const searchParams = useSearchParams();
   const lessonIdStr = searchParams.get("lesson_id");
@@ -170,16 +164,13 @@ function DashboardPageContent() {
   const defaultMinutes = parseInt(timerQuery, 10) || 5;
   const [secondsLeft, setSecondsLeft] = useState(defaultMinutes * 60);
   const [isRunning, setIsRunning] = useState(false);
-  const [startingLesson, setStartingLesson] = useState(false);
-  const [isLessonStarted, setIsLessonStarted] = useState(false);
 
-  let message = "授業開始ボタンを押して、授業を開始してください";
-    if (isLessonStarted && !isRunning) {
-    message = "演習開始のボタンを押してください";
-  }
+  const [isLessonStarted] = useState(true);
+
+  let message = "演習開始のボタンを押してください";
   if (isRunning) {
     message = "時間になったら演習終了を押してください";
-  } else if (isLessonStarted && !isRunning && secondsLeft > 0 && secondsLeft < defaultMinutes * 60) {
+  } else if (!isRunning && secondsLeft > 0 && secondsLeft < defaultMinutes * 60) {
     message = "一時停止中...";
   }
 
@@ -209,70 +200,96 @@ function DashboardPageContent() {
     }
   };
 
-  const lessonStart = async () => {
-    if (!lessonId) {
-      alert("lesson_id が取得できません。");
+  const startTimer = async () => {
+    if (!isLessonStarted) {
+      alert("授業が開始されていません。前の画面に戻って授業を開始してください。");
       return;
     }
+
     const themeId = selectedContent?.lesson_theme_id ?? firstTheme?.lesson_theme_id;
-    if (themeId == null) {
-      alert("lesson_theme_id が取得できません。");
+
+    if (!themeId) {
+      alert("演習のテーマIDが見つかりません。");
       return;
     }
+
     if (!apiBaseUrl) {
       alert("APIのベースURLが設定されていません。");
       return;
     }
 
-    setStartingLesson(true);
     try {
-      const url = `${apiBaseUrl}/api/answer-data-bulk/lessons/${lessonId}/themes/${themeId}/generate-answer-data`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+      const res = await fetch(`${apiBaseUrl}/api/lesson_themes/${themeId}/start_exercise`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
       });
+
       if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(`回答データ生成に失敗しました: ${res.status}\n${msg}`);
+        const errorData = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(errorData.message || `HTTP error ${res.status}`);
       }
+
       const data = await res.json();
-      socketRef.current?.emit("to_flutter", "lesson_start");
-      console.log("🌐 Web send to server → lesson_start");
-      alert(data.message ?? "授業を開始しました。");
+      console.log('API Response:', data.message);
 
-      setIsLessonStarted(true);
-
-    } catch (err) {
-      console.error(err);
-      alert(String(err));
-    } finally {
-      setStartingLesson(false);
-    }
-  };
-
-  const startTimer = () => {
-    if (!isLessonStarted) {
-        alert("先に授業開始ボタンを押してください。");
-        return;
-    }
-    setIsRunning(true);
-    const themeId = selectedContent?.lesson_theme_id ?? firstTheme?.lesson_theme_id;
-    if (themeId != null) {
+      setIsRunning(true);
       const msg = `lesson_theme_id,${themeId}`;
       socketRef.current?.emit("to_flutter", msg);
       console.log("🌐 Web send to server →", msg);
-    } else {
-      socketRef.current?.emit("to_flutter", "exercise_start");
-      console.warn("lesson_theme_id が取得できなかったため fallback しました");
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      alert(`演習開始に失敗しました: ${errorMessage}`);
+      console.error(err);
     }
   };
 
-  const stopTimer = () => {
-    setIsRunning(false);
-    socketRef.current?.emit("to_flutter", "exercise_end");
-    console.log("🌐 Web send to server → exercise_end");
+  // ▼▼▼▼▼ ここから変更 ▼▼▼▼▼
+  const stopTimer = async () => {
+    const themeId = selectedContent?.lesson_theme_id ?? firstTheme?.lesson_theme_id;
+
+    if (!themeId) {
+      alert("演習のテーマIDが見つかりません。");
+      setIsRunning(false);
+      return;
+    }
+
+    if (!apiBaseUrl) {
+      alert("APIのベースURLが設定されていません。");
+      setIsRunning(false);
+      return;
+    }
+
+    try {
+      // 要件⑤: バックエンドAPIを呼び出す
+      const res = await fetch(`${apiBaseUrl}/api/lesson_themes/${themeId}/end_exercise`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(errorData.message || `HTTP error ${res.status}`);
+      }
+      
+      const data = await res.json();
+      console.log('API Response:', data.message);
+
+      // API成功後にタイマーを停止し、新しい形式でWebSocketメッセージを送信
+      setIsRunning(false);
+      const message = `exercise_end,${themeId}`; // 新しいメッセージ形式
+      socketRef.current?.emit("to_flutter", message);
+      console.log("🌐 Web send to server →", message);
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      alert(`演習終了に失敗しました: ${errorMessage}`);
+      console.error(err);
+      // API失敗時もUIのタイマーは停止する
+      setIsRunning(false);
+    }
   };
+  // ▲▲▲▲▲ ここまで変更 ▲▲▲▲▲
 
   const [students, setStudents] = useState<Student[]>([
     { no: 1, id: 1, name: "生徒A", lectureProgress: 35, lectureView: 'done', confirm1Progress: 60, confirm1: 'done', confirm2Progress: 10, confirm2: 'done', question: true, attend: true, q1: '', q1Progress: 0, q2: '', q2Progress: 0, q3: '', q3Progress: 0, q4: '', q4Progress: 0 },
@@ -367,7 +384,6 @@ function DashboardPageContent() {
     );
   }, [lessonId, apiBaseUrl, calcIcon, calcProgress]);
 
-  // 5秒ごとのAPIポーリング (データの同期)
   useEffect(() => {
     if (!lessonId || !isRunning) return;
 
@@ -377,7 +393,6 @@ function DashboardPageContent() {
     return () => clearInterval(intervalId);
   }, [lessonId, isRunning, fetchAllStudentsData]);
 
-  // 1秒ごとのUIプログレスバー自動更新
   useEffect(() => {
     if (!isRunning) return;
 
@@ -521,7 +536,6 @@ function DashboardPageContent() {
 
   return (
     <div>
-      {/* 上部: 戻る + タイトル */}
       <div className="flex items-center gap-4 mb-4 justify-between">
         <div>
           <button
@@ -537,13 +551,11 @@ function DashboardPageContent() {
         </div>
       </div>
 
-      {/* 授業情報 */}
       <div className="text-gray-600 mb-2 flex justify-between">
         <div>
           <div>{dateInfoQuery}</div>
           <div>{contentInfoQuery}</div>
         </div>
-        {/* タイマー */}
         <div
           className="m-4 w-24 h-24 border-4 border-blue-600 rounded-full flex items-center justify-center text-blue-600 text-lg font-bold cursor-pointer hover:opacity-80"
           title="クリックして時間を変更"
@@ -553,18 +565,7 @@ function DashboardPageContent() {
         </div>
       </div>
 
-      {/* 上部ボタン */}
       <div className="flex items-center mb-2 gap-2 justify-end">
-        {/* 授業開始（追加） */}
-        <button
-          className={`bg-blue-500 text-white px-3 py-1 rounded ${
-            startingLesson || isLessonStarted ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-600"
-          }`}
-          disabled={startingLesson || isLessonStarted}
-          onClick={lessonStart}
-        >
-          {startingLesson ? "開始処理中..." : (isLessonStarted ? "授業開始済み" : "授業開始")}
-        </button>
         <button
           className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
           onClick={startTimer}
@@ -584,7 +585,6 @@ function DashboardPageContent() {
         </button>
       </div>
 
-      {/* メイン表 */}
       <div className="overflow-x-auto">
         <table className="border border-[#979191] text-sm min-w-max w-full">
           <thead className="bg-white">
@@ -601,7 +601,6 @@ function DashboardPageContent() {
               <th className="p-2 border border-[#979191]">問題3</th>
               <th className="p-2 border border-[#979191]">問題4</th>
             </tr>
-            {/* 割合バーの行 */}
             <tr className="bg-white text-xs">
               <td className="p-1 border border-[#979191] text-center"></td>
               <td className="p-1 border border-[#979191] text-center"></td>
