@@ -2,6 +2,7 @@
 export const dynamic = "force-dynamic";
 import React, { useState, useEffect, Suspense, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
+import { apiBaseUrl } from '@/lib/apiConfig';
 
 type Material = {
   material_id: number
@@ -39,7 +40,7 @@ interface RowData {
 
 // 内部コンポーネント：useSearchParams を利用
 function SettingPageContent() {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
   const searchParams = useSearchParams()
   const timetableIdStr = searchParams.get("tid")
   const timetableId = timetableIdStr ? parseInt(timetableIdStr, 10) : null

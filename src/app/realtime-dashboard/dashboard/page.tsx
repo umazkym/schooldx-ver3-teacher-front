@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef, Suspense, useCallback } from "react
 import { useSearchParams, useRouter } from "next/navigation";
 import { Socket } from "socket.io-client";
 import { getSocket } from "@/lib/socket";
+import { apiBaseUrl } from '@/lib/apiConfig';
 
 /**
  * 型定義
@@ -79,7 +80,6 @@ const questionIdToKeyMap: { [id: number]: { status: StudentStringKey, progress: 
  */
 function DashboardPageContent() {
   const router = useRouter();
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   const socketRef = useRef<Socket | null>(null);
 

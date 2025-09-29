@@ -1,7 +1,7 @@
 import { io, Socket } from "socket.io-client";
+import { apiBaseUrl } from '@/lib/apiConfig';
 
 let socket: Socket | null = null;
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 /**
  * 共有されたSocketインスタンスを取得または新規作成します。
@@ -10,11 +10,11 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
  */
 export const getSocket = (): Socket => {
   if (!socket) {
-    if (!API_BASE_URL) {
+    if (!apiBaseUrl) {  // API_BASE_URL を apiBaseUrl に変更
       throw new Error("APIのベースURLが設定されていません。");
     }
     console.log("Creating new socket connection...");
-    socket = io(API_BASE_URL, {
+    socket = io(apiBaseUrl, {  // API_BASE_URL を apiBaseUrl に変更
       transports: ["websocket"],
       withCredentials: true,
     });

@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
 import { AiFillFolder } from "react-icons/ai"
+import { apiBaseUrl } from '@/lib/apiConfig';
 
 /**
  * 要件:
@@ -53,8 +54,6 @@ type PartGroup = {
 }
 
 export default function CurriculumPage() {
-
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   // =========================
   // State
   // =========================

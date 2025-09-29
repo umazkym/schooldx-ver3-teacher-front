@@ -1,6 +1,7 @@
 "use client"
 import React, { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
+import { apiBaseUrl } from '@/lib/apiConfig';
 
 // --- 型定義 ---
 type ClassData = { class_id: number; class_name: string; grade: number; };
@@ -72,7 +73,6 @@ const getCurrentAcademicYear = (): number => {
 
 export default function GradesPage() {
     const router = useRouter();
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
     // --- State管理 ---
     const [classes, setClasses] = useState<ClassData[]>([]);

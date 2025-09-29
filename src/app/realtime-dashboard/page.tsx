@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { addMonths, subMonths, format, getDay } from "date-fns";
 import { useRouter } from "next/navigation";
+import { apiBaseUrl } from '@/lib/apiConfig';
 
 // クラスごとの色定義
 const classColors = [
@@ -23,7 +24,6 @@ const getClassColors = (classId: number | null) => {
 
 export default function RealtimeDashboardCalendarPage() {
   const router = useRouter();
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());

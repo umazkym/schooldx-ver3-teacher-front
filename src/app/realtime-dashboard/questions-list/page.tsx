@@ -3,9 +3,9 @@ export const dynamic = "force-dynamic";
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { apiBaseUrl } from '@/lib/apiConfig';
 
 function QuestionsListPageContent() {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   const router = useRouter();
   const searchParams = useSearchParams();
   // ダッシュボードやcontent-selectionから受け取る

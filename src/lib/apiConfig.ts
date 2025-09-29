@@ -5,4 +5,6 @@ const rawApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
  * アプリケーション全体で使用するAPIのベースURL。
  * Mixed Contentエラーを回避するため、http:// で始まるURLは https:// に変換されます。
  */
-export const apiBaseUrl = rawApiBaseUrl.replace(/^http:/, 'https://');
+export const apiBaseUrl = rawApiBaseUrl.includes('localhost') 
+  ? rawApiBaseUrl 
+  : rawApiBaseUrl.replace(/^http:/, 'https:');

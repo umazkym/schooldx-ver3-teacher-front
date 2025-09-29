@@ -4,10 +4,10 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { getSocket, disconnectSocket } from "@/lib/socket";
 import { Socket } from "socket.io-client";
+import { apiBaseUrl } from '@/lib/apiConfig';
 
 export default function ContentSelectionComponent() {
   const router = useRouter();
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   const searchParams = useSearchParams();
   const lessonIdStr = searchParams.get("lesson_id");
   const lessonId   = lessonIdStr ? Number(lessonIdStr) : null;

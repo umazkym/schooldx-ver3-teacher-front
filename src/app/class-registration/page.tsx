@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from "react"
 import { addMonths, subMonths, format, getDay } from "date-fns"
 import { useRouter } from "next/navigation"
+import { apiBaseUrl } from '@/lib/apiConfig';
 
 // クラスごとの色定義
 const classColors = [
@@ -25,7 +26,6 @@ const getClassColors = (classId: number | null) => {
  */
 export default function ClassRegistrationPage() {
   const router = useRouter()
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
