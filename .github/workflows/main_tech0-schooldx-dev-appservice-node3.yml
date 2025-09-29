@@ -9,6 +9,11 @@ on:
       - main
   workflow_dispatch:
 
+# 同時実行を防ぐための設定を追加
+concurrency:
+  group: azure-deploy-${{ github.ref }}
+  cancel-in-progress: false  # 実行中のデプロイはキャンセルしない
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -54,6 +59,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
     
     steps:
       - name: Download artifact from build job
@@ -61,6 +69,18 @@ jobs:
         with:
           name: node-app
       
+      # Azure CLIを使用してデプロイ状態をチェック（オプション）
+      - name: Check deployment status
+        uses: azure/CLI@v1
+        continue-on-error: true
+        with:
+          inlineScript: |
+            # デプロイメント状態の確認（エラーを無視）
+            az webapp deployment list --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} --name tech0-schooldx-dev-appservice-node3 || true
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      # リトライ機能を持つデプロイ
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
@@ -69,3 +89,6 @@ jobs:
           slot-name: 'Production'
           package: release.zip # zipファイルを直接デプロイ
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_NODE3 }}
+          # リトライ設定を追加
+          retry-on-error: true
+          retry-delay-seconds: 30
