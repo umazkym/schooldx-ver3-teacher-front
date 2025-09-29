@@ -39,7 +39,10 @@ interface RowData {
 
 // 内部コンポーネント：useSearchParams を利用
 function SettingPageContent() {
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  // ▼▼▼【修正】Mixed Content エラーを回避するため、httpをhttpsに置換 ▼▼▼
+  const rawApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+  const apiBaseUrl = rawApiBaseUrl.replace(/^http:/, 'https://');
+  // ▲▲▲【修正】ここまで ▲▲▲
   const searchParams = useSearchParams()
   const timetableIdStr = searchParams.get("tid")
   const timetableId = timetableIdStr ? parseInt(timetableIdStr, 10) : null
