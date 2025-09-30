@@ -40,7 +40,6 @@ interface RowData {
 
 // 内部コンポーネント：useSearchParams を利用
 function SettingPageContent() {
-
   const searchParams = useSearchParams()
   const timetableIdStr = searchParams.get("tid")
   const timetableId = timetableIdStr ? parseInt(timetableIdStr, 10) : null
@@ -51,6 +50,10 @@ function SettingPageContent() {
   const [lessonThemes, setLessonThemes] = useState<LessonTheme[]>([])
   const [classes, setClasses] = useState<ClassData[]>([])
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null)
+  
+  // ▼▼▼ 修正1: errorのstate定義を追加 ▼▼▼
+  const [error, setError] = useState<string | null>(null)
+  // ▲▲▲ 修正1ここまで ▲▲▲
 
   // テーブル行
   const [rows, setRows] = useState<RowData[]>([
@@ -70,20 +73,28 @@ function SettingPageContent() {
       console.error("APIのベースURLが設定されていません。");
       return;
     }
+    
+    // ▼▼▼ デバッグログ追加 ▼▼▼
+    const fullUrl = `${apiBaseUrl}/classes`;
+    console.log('=== fetchClasses Debug ===');
+    console.log('apiBaseUrl:', apiBaseUrl);
+    console.log('fullUrl:', fullUrl);
+    console.log('fullUrl protocol:', new URL(fullUrl).protocol);
+    // ▲▲▲ デバッグログ追加 ▲▲▲
+    
     try {
-      const res = await fetch(`${apiBaseUrl}/classes`, { method: "GET" })
-      if (!res.ok) {
-        console.error("Failed to fetch classes")
-        return
+      const res = await fetch(fullUrl, { method: "GET" });
+      if (!res.ok) throw new Error("クラス一覧の取得に失敗しました");
+      const data = await res.json();
+      setClasses(data);
+      if (data.length > 0) {
+        // ▼▼▼ 修正2: String()を削除してnumber型に ▼▼▼
+        setSelectedClassId(data[0].class_id);
+        // ▲▲▲ 修正2ここまで ▲▲▲
       }
-      const data = await res.json()
-      setClasses(data || [])
-      // デフォルトで最初のクラスを選択
-      if (data && data.length > 0) {
-        setSelectedClassId(data[0].class_id)
-      }
-    } catch (err) {
-      console.error(err)
+    } catch (error) {
+      console.error(error);
+      setError(error instanceof Error ? error.message : String(error));
     }
   }, [apiBaseUrl]);
 
@@ -210,18 +221,22 @@ function SettingPageContent() {
       alert("クラスを選択してください。");
       return;
     }
+
     const themeIds = rows
       .map((row) => row.selectedThemeId)
       .filter((id): id is number => id !== null && id > 0);
+
     if (themeIds.length === 0) {
       alert("登録するテーマを1つ以上選択してください。");
       return;
     }
+
     const payload = {
-      class_id: selectedClassId,  // ユーザーが選択したクラスID
+      class_id: selectedClassId,
       timetable_id: timetableId,
       lesson_theme_ids: themeIds,
     };
+
     try {
       const res = await fetch(`${apiBaseUrl}/lesson_registrations/`, {
         method: "POST",
@@ -230,10 +245,12 @@ function SettingPageContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+
       if (!res.ok) {
         const msg = await res.text();
         throw new Error(`Register Lesson failed: ${res.status}, ${msg}`);
       }
+
       await res.json();
       alert("登録完了しました");
     } catch (error) {
@@ -299,6 +316,13 @@ function SettingPageContent() {
 
   return (
     <div>
+      {/* エラー表示を追加（オプション） */}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+      
       {/* 上部 */}
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -307,7 +331,7 @@ function SettingPageContent() {
           </button>
         </div>
         <div className="flex gap-4 items-center">
-          {/* クラス選択ドロップダウンを追加 */}
+          {/* クラス選択ドロップダウン */}
           <div>
             <label className="text-sm mr-2">クラス:</label>
             <select
@@ -357,6 +381,7 @@ function SettingPageContent() {
               const chapterNames = getChapterNamesForRow(row)
               const unitNames = getUnitNamesForRow(row)
               const themes = getThemesForRow(row)
+
               return (
                 <tr key={idx} className="text-center">
                   <td className="p-2 border-b border-gray-200">{row.no}</td>
@@ -415,58 +440,4 @@ function SettingPageContent() {
                       onChange={(e) => handleChangeUnit(idx, e.target.value)}
                     >
                       <option value="">選択</option>
-                      {unitNames.map((un) => (
-                        <option key={un} value={un}>
-                          {un}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="p-2 border-b border-gray-200">
-                    <select
-                      aria-label="テーマの選択"
-                      className="border border-gray-300 rounded px-1 py-0.5 text-center"
-                      value={row.selectedThemeId ?? ""}
-                      onChange={(e) =>
-                        handleChangeTheme(idx, parseInt(e.target.value, 10) || 0)
-                      }
-                    >
-                      <option value="">選択</option>
-                      {themes.map((t) => (
-                        <option key={t.lesson_theme_id} value={t.lesson_theme_id}>
-                          {t.lesson_theme_name}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="p-2 border-b border-gray-200 text-red-500">
-                    すべてのコンテンツが登録されています
-                  </td>
-                </tr>
-              )
-            })}
-            <tr>
-              <td colSpan={7} className="p-2 border-b border-gray-200 text-center">
-                <button
-                  onClick={addRow}
-                  className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-                >
-                  ＋
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-// Suspense でラップして useSearchParams の利用を安全にする
-export default function ClassRegistrationSettingPage() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <SettingPageContent />
-    </Suspense>
-  )
-}
+                      {unitNames.map((

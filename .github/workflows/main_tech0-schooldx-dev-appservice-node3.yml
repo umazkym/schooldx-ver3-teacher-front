@@ -31,10 +31,9 @@ jobs:
         env:
           NEXT_PUBLIC_API_BASE_URL: https://tech0-schooldx-dev-appservice-python3-hbbbczata7epcaa8.eastus-01.azurewebsites.net
         run: |
-          echo "Building with NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL"
           npm install
+          rm -rf .next
           npm run build --if-present
-      # ▲▲▲ ここまで確認 ▲▲▲
 
       - name: Create deployment package
         run: |
