@@ -1,31 +1,24 @@
-// 環境変数を読み込みます。
 const rawApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-/**
- * アプリケーション全体で使用するAPIのベースURL。
- * Mixed Contentエラーを回避するため、本番環境（URLに'localhost'を含まない場合）では、
- * プロトコルを常に'https'に変換します。
- */
+console.log("環境変数から読み込んだURL:", rawApiBaseUrl); // デバッグ用
+
 let finalApiBaseUrl = rawApiBaseUrl;
 
-// 'localhost'を含まないURL（本番環境と想定）の場合、プロトコルを確認・修正します。
-if (rawApiBaseUrl && !rawApiBaseUrl.includes('localhost')) {
-  try {
-    // URLオブジェクトを使用して、安全にプロトコルを'https:'に設定します。
-    const url = new URL(rawApiBaseUrl);
-    url.protocol = 'https:';
-    finalApiBaseUrl = url.toString();
-
-    // URLオブジェクトが末尾にスラッシュを追加する場合があるため、削除します。
-    if (finalApiBaseUrl.endsWith('/')) {
-      finalApiBaseUrl = finalApiBaseUrl.slice(0, -1);
+// すべてのURLでhttpsに強制変換（localhost以外）
+if (rawApiBaseUrl) {
+  if (rawApiBaseUrl.includes('localhost') || rawApiBaseUrl.includes('127.0.0.1')) {
+    finalApiBaseUrl = rawApiBaseUrl; // localhostはそのまま
+  } else {
+    try {
+      const url = new URL(rawApiBaseUrl.startsWith('http') ? rawApiBaseUrl : `https://${rawApiBaseUrl}`);
+      url.protocol = 'https:';
+      finalApiBaseUrl = url.toString().replace(/\/$/, '');
+    } catch (e) {
+      console.error("無効なURL:", rawApiBaseUrl, e);
     }
-  } catch (e) {
-    // 環境変数のURLが不正な形式だった場合のエラーハンドリング
-    console.error("無効なNEXT_PUBLIC_API_BASE_URLです:", rawApiBaseUrl, e);
-    // エラーが発生した場合は、元の値をそのまま使用します（問題の切り分けのため）。
-    finalApiBaseUrl = rawApiBaseUrl;
   }
 }
+
+console.log("最終的なAPIベースURL:", finalApiBaseUrl); // デバッグ用
 
 export const apiBaseUrl = finalApiBaseUrl;
