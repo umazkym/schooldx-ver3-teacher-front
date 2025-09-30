@@ -1,24 +1,34 @@
+// src/lib/apiConfig.ts
 const rawApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-console.log("環境変数から読み込んだURL:", rawApiBaseUrl); // デバッグ用
+// ▼▼▼ デバッグ用ログ追加 ▼▼▼
+if (typeof window !== 'undefined') {
+  console.log('=== API Config Debug ===');
+  console.log('Raw API Base URL:', rawApiBaseUrl);
+  console.log('Environment:', process.env.NODE_ENV);
+}
+// ▲▲▲ デバッグ用ログ追加 ▲▲▲
 
 let finalApiBaseUrl = rawApiBaseUrl;
 
-// すべてのURLでhttpsに強制変換（localhost以外）
-if (rawApiBaseUrl) {
-  if (rawApiBaseUrl.includes('localhost') || rawApiBaseUrl.includes('127.0.0.1')) {
-    finalApiBaseUrl = rawApiBaseUrl; // localhostはそのまま
-  } else {
-    try {
-      const url = new URL(rawApiBaseUrl.startsWith('http') ? rawApiBaseUrl : `https://${rawApiBaseUrl}`);
-      url.protocol = 'https:';
-      finalApiBaseUrl = url.toString().replace(/\/$/, '');
-    } catch (e) {
-      console.error("無効なURL:", rawApiBaseUrl, e);
+if (rawApiBaseUrl && !rawApiBaseUrl.includes('localhost')) {
+  try {
+    const url = new URL(rawApiBaseUrl);
+    url.protocol = 'https:';
+    finalApiBaseUrl = url.toString();
+    if (finalApiBaseUrl.endsWith('/')) {
+      finalApiBaseUrl = finalApiBaseUrl.slice(0, -1);
     }
+    
+    // ▼▼▼ デバッグ用ログ追加 ▼▼▼
+    if (typeof window !== 'undefined') {
+      console.log('Final API Base URL:', finalApiBaseUrl);
+    }
+    // ▲▲▲ デバッグ用ログ追加 ▲▲▲
+  } catch (e) {
+    console.error("無効なNEXT_PUBLIC_API_BASE_URLです:", rawApiBaseUrl, e);
+    finalApiBaseUrl = rawApiBaseUrl;
   }
 }
-
-console.log("最終的なAPIベースURL:", finalApiBaseUrl); // デバッグ用
 
 export const apiBaseUrl = finalApiBaseUrl;
