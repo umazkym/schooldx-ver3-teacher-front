@@ -67,7 +67,10 @@ function SettingPageContent() {
       return;
     }
     
-    const fullUrl = `${apiBaseUrl}/classes`;
+    // ▼▼▼ 末尾にスラッシュを追加 ▼▼▼
+    const fullUrl = `${apiBaseUrl}/classes/`;
+    // ▲▲▲ 修正ここまで ▲▲▲
+    
     console.log('=== fetchClasses Debug ===');
     console.log('apiBaseUrl:', apiBaseUrl);
     console.log('fullUrl:', fullUrl);
