@@ -233,7 +233,7 @@ function DashboardPageContent() {
       console.log('API Response:', data.message);
 
       setIsRunning(true);
-      const msg = `lesson_theme_id,${themeId}`;
+      const msg = `exercise_start,${themeId}`;
       socketRef.current?.emit("to_flutter", msg);
       console.log("🌐 Web send to server →", msg);
 
