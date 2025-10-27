@@ -164,7 +164,7 @@ function DashboardPageContent() {
 
         // 生徒情報を一意に抽出
         const studentMap = new Map<number, Student>();
-        data.forEach((item: any) => {
+        data.forEach((item: RawDataItemFromGrades) => {
           if (!studentMap.has(item.student.student_id)) {
             studentMap.set(item.student.student_id, {
               id: item.student.student_id,

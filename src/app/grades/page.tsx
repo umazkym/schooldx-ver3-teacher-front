@@ -148,7 +148,7 @@ export default function GradesPage() {
             }
         };
         fetchLessons();
-    }, [selectedClassId, selectedAcademicYear, apiBaseUrl]);
+    }, [selectedClassId, selectedAcademicYear]);
 
     useEffect(() => {
         if (!selectedLessonId || !apiBaseUrl || !selectedAcademicYear) {
@@ -194,7 +194,7 @@ export default function GradesPage() {
             }
         };
         fetchGradesData();
-    }, [selectedLessonId, apiBaseUrl, classes, selectedClassId, selectedAcademicYear]);
+    }, [selectedLessonId, classes, selectedClassId, selectedAcademicYear]);
 
     const statistics = useMemo(() => {
         if (rawData.length === 0) return null;
