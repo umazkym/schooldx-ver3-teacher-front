@@ -26,16 +26,8 @@ interface AnswerDataWithDetails {
 // 画面表示用の型
 interface Student {
   id: number; // student_idと一致させる
-  no: number;
+  students_number: number; // students_tableの出席番号
   name: string;
-  lectureProgress: number;
-  lectureView: string;
-  confirm1Progress: number;
-  confirm1: string;
-  confirm2Progress: number;
-  confirm2: string;
-  question: boolean;
-  attend: boolean;
   // 4問分の解答状況
   q1: string;
   q1Progress: number;
@@ -146,6 +138,44 @@ function DashboardPageContent() {
         const d = (await res.json()) as LessonInformation;
         setLessonInfo(d);
       } catch {}
+    })();
+  }, [lessonId, apiBaseUrl]);
+
+  // 生徒データを API から取得
+  useEffect(() => {
+    if (!lessonId || !apiBaseUrl) return;
+    (async () => {
+      try {
+        const res = await fetch(
+          `${apiBaseUrl}/grades/raw_data?lesson_id=${lessonId}`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // 生徒情報を一意に抽出
+        const studentMap = new Map<number, Student>();
+        data.forEach((item: any) => {
+          if (!studentMap.has(item.student.student_id)) {
+            studentMap.set(item.student.student_id, {
+              id: item.student.student_id,
+              students_number: item.student.students_number,
+              name: item.student.name,
+              q1: '',
+              q1Progress: 0,
+              q2: '',
+              q2Progress: 0,
+              q3: '',
+              q3Progress: 0,
+              q4: '',
+              q4Progress: 0,
+            });
+          }
+        });
+
+        setStudents(Array.from(studentMap.values()));
+      } catch (err) {
+        console.error('Failed to fetch student data:', err);
+      }
     })();
   }, [lessonId, apiBaseUrl]);
 
@@ -291,12 +321,7 @@ function DashboardPageContent() {
   };
   // ▲▲▲▲▲ ここまで変更 ▲▲▲▲▲
 
-  const [students, setStudents] = useState<Student[]>([
-    { no: 1, id: 1, name: "生徒A", lectureProgress: 35, lectureView: 'done', confirm1Progress: 60, confirm1: 'done', confirm2Progress: 10, confirm2: 'done', question: true, attend: true, q1: '', q1Progress: 0, q2: '', q2Progress: 0, q3: '', q3Progress: 0, q4: '', q4Progress: 0 },
-    { no: 2, id: 2, name: "生徒B", lectureProgress: 10, lectureView: 'done', confirm1Progress: 90, confirm1: 'done', confirm2Progress: 40, confirm2: 'done', question: true, attend: true, q1: '', q1Progress: 0, q2: '', q2Progress: 0, q3: '', q3Progress: 0, q4: '', q4Progress: 0 },
-    { no: 3, id: 3, name: "生徒C", lectureProgress: 80, lectureView: 'done', confirm1Progress: 5, confirm1: 'done', confirm2Progress: 75, confirm2: 'done', question: false, attend: true, q1: '', q1Progress: 0, q2: '', q2Progress: 0, q3: '', q3Progress: 0, q4: '', q4Progress: 0 },
-    { no: 4, id: 4, name: "生徒D", lectureProgress: 45, lectureView: 'done', confirm1Progress: 10, confirm1: 'done', confirm2Progress: 30, confirm2: 'done', question: true, attend: true, q1: '', q1Progress: 0, q2: '', q2Progress: 0, q3: '', q3Progress: 0, q4: '', q4Progress: 0 },
-  ]);
+  const [students, setStudents] = useState<Student[]>([]);
 
   const studentsRef = useRef(students);
   useEffect(() => {
@@ -462,15 +487,6 @@ function DashboardPageContent() {
     }
   }
 
-  function calcPercentage(
-    arr: { lectureView: string; confirm1: string; confirm2: string }[],
-    key: "lectureView" | "confirm1" | "confirm2"
-  ) {
-    const total = arr.length;
-    const doneCount = arr.filter((s) => s[key] === "done").length;
-    return total > 0 ? (doneCount / total) * 100 : 0;
-  }
-
   function calcQAPercentage(
     arr: Student[],
     key: "q1" | "q2" | "q3" | "q4"
@@ -492,13 +508,6 @@ function DashboardPageContent() {
     }
     if (status === "wrong") {
       return "p-2 border border-[#979191] bg-[#FFD0D0]";
-    }
-    return "p-2 border border-[#979191] bg-white";
-  }
-
-  function bgColorCheck(status: string) {
-    if (status === "done") {
-      return "p-2 border border-[#979191] bg-[#C6EFD0]";
     }
     return "p-2 border border-[#979191] bg-white";
   }
@@ -591,11 +600,6 @@ function DashboardPageContent() {
             <tr>
               <th className="p-2 border border-[#979191]">出席番号</th>
               <th className="p-2 border border-[#979191]">名前</th>
-              <th className="p-2 border border-[#979191]">講義視聴</th>
-              <th className="p-2 border border-[#979191]">確認問題1</th>
-              <th className="p-2 border border-[#979191]">確認問題2</th>
-              <th className="p-2 border border-[#979191]">質問</th>
-              <th className="p-2 border border-[#979191]">出席</th>
               <th className="p-2 border border-[#979191]">問題1</th>
               <th className="p-2 border border-[#979191]">問題2</th>
               <th className="p-2 border border-[#979191]">問題3</th>
@@ -604,33 +608,6 @@ function DashboardPageContent() {
             <tr className="bg-white text-xs">
               <td className="p-1 border border-[#979191] text-center"></td>
               <td className="p-1 border border-[#979191] text-center"></td>
-              <td className="p-1 border border-[#979191]">
-                <ProgressBarBar
-                  color="green"
-                  bg="gray"
-                  percentage={calcPercentage(students, "lectureView")}
-                />
-              </td>
-              <td className="p-1 border border-[#979191]">
-                <ProgressBarBar
-                  color="green"
-                  bg="gray"
-                  percentage={calcPercentage(students, "confirm1")}
-                />
-              </td>
-              <td className="p-1 border border-[#979191]">
-                <ProgressBarBar
-                  color="green"
-                  bg="gray"
-                  percentage={calcPercentage(students, "confirm2")}
-                />
-              </td>
-              <td className="p-1 border border-[#979191] text-center">
-                {students.filter((s) => s.question).length}人
-              </td>
-              <td className="p-1 border border-[#979191] text-center">
-                {students.filter((s) => s.attend).length}人
-              </td>
               <td className="p-1 border border-[#979191]">
                 <ProgressBarBar
                   color="green"
@@ -663,37 +640,9 @@ function DashboardPageContent() {
           </thead>
           <tbody>
             {students.map((st) => (
-              <tr key={st.no} className="text-center">
-                <td className="p-2 border border-[#979191]">{st.no}</td>
+              <tr key={st.id} className="text-center">
+                <td className="p-2 border border-[#979191]">{st.students_number}</td>
                 <td className="p-2 border border-[#979191]">{st.name}</td>
-                <td className={bgColorCheck(st.lectureView)}>
-                  <CellWithBar
-                    icon={st.lectureView}
-                    progress={st.lectureProgress}
-                   />
-                </td>
-                <td className={bgColorCheck(st.confirm1)}>
-                  <CellWithBar
-                    icon={st.confirm1}
-                    progress={st.confirm1Progress}
-                  />
-                </td>
-                <td className={bgColorCheck(st.confirm2)}>
-                  <CellWithBar
-                    icon={st.confirm2}
-                    progress={st.confirm2Progress}
-                  />
-                </td>
-                <td className="p-2 border border-[#979191]">
-                  {st.question && (
-                    <span className="font-bold text-[#555454]">✓</span>
-                  )}
-                </td>
-                <td className="p-2 border border-[#979191]">
-                  {st.attend && (
-                    <span className="font-bold text-[#555454]">✓</span>
-                  )}
-                </td>
                 <td className={bgColorQA(st.q1)}>
                   <CellWithBar icon={st.q1} progress={st.q1Progress} />
                 </td>

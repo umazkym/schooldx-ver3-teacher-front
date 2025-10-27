@@ -340,7 +340,7 @@ export default function GradesPage() {
                     </div>
 
                     <section className="bg-white p-6 rounded-xl shadow-sm">
-                        <h2 className="text-xl font-bold text-gray-800 pb-2 mb-6 border-b-2 border-gray-200">📊 全体サマリー分析</h2>
+                        <h2 className="text-sm font-bold text-gray-800 pb-2 mb-6 border-b-2 border-gray-200">全体サマリー分析</h2>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                             <SummaryCard title="クラス平均正答率" value={`${Math.round(statistics.classAverage)}%`} color="blue" description="この授業における全問題の正答率の平均値です。" />
                             <SummaryCard 
@@ -355,7 +355,7 @@ export default function GradesPage() {
                     </section>
                     
                     <section className="bg-white p-6 rounded-xl shadow-sm">
-                        <h2 className="text-xl font-bold text-gray-800 pb-2 mb-6 border-b-2 border-gray-200">🔬 設問別 詳細分析</h2>
+                        <h2 className="text-xl font-bold text-gray-800 pb-2 mb-6 border-b-2 border-gray-200">設問別 詳細分析</h2>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-8">
                             {Object.entries(statistics.questionStats).map(([label, stats]) => {
                                 const gradeAvgItem = gradeSummary.find(item => item.question_id === stats.question_id);
@@ -365,7 +365,7 @@ export default function GradesPage() {
                     </section>
                     
                      <section className="bg-white p-6 rounded-xl shadow-sm">
-                         <h2 className="text-xl font-bold text-gray-800 pb-2 mb-6 border-b-2 border-gray-200">📝 定性（アンケート）分析</h2>
+                         <h2 className="text-xl font-bold text-gray-800 pb-2 mb-6 border-b-2 border-gray-200">定性（アンケート）分析</h2>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                              <KeywordMap keywords={keywordAnalysis} />
                              <CommentsList comments={comments} />
@@ -387,13 +387,10 @@ const SummaryCard = ({ title, value, color, description, isProblemCard = false }
     };
     const c = colors[color as keyof typeof colors] || colors.gray;
 
-    const problemValueClasses = "text-xl font-bold whitespace-nowrap overflow-hidden text-ellipsis";
-    const normalValueClasses = "text-4xl font-bold";
-
     return (
-        <div className={`${c.bg} p-4 rounded-lg text-center`} title={description}>
-            <p className={`text-sm ${c.text}`}>{title}</p>
-            <p className={`${c.value} ${isProblemCard ? problemValueClasses : normalValueClasses}`}>
+        <div className={`${c.bg} p-4 rounded-lg text-center flex flex-col justify-center min-h-[140px]`} title={description}>
+            <p className={`${c.text} mb-2`}>{title}</p>
+            <p className={`${c.value} font-bold break-words px-2`}>
                 {value}
             </p>
         </div>
