@@ -378,7 +378,7 @@ export default function GradesPage() {
 }
 
 
-const SummaryCard = ({ title, value, color, description }: { title: string, value: string, color: string, description: string }) => {
+const SummaryCard = ({ title, value, color, description, isProblemCard }: { title: string, value: string, color: string, description: string, isProblemCard?: boolean }) => {
     const colors = {
         blue: { bg: 'bg-blue-50', text: 'text-blue-700', value: 'text-blue-800' },
         gray: { bg: 'bg-gray-50', text: 'text-gray-600', value: 'text-gray-700' },
