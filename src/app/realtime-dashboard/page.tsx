@@ -115,7 +115,7 @@ export default function RealtimeDashboardCalendarPage() {
         console.error(e);
       }
     })();
-  }, [apiBaseUrl]);
+  }, []);
 
   const scheduleMap = useMemo(() => {
     const map: Record<

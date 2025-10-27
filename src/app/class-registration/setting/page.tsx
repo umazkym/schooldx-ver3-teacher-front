@@ -88,7 +88,7 @@ function SettingPageContent() {
       console.error(error);
       setError(error instanceof Error ? error.message : String(error));
     }
-  }, [apiBaseUrl]);
+  }, []);
 
   const fetchAllLessonData = useCallback(async () => {
     if (!apiBaseUrl) {
@@ -111,7 +111,7 @@ function SettingPageContent() {
     } catch (err) {
       console.error(err)
     }
-  }, [apiBaseUrl]);
+  }, []);
 
   useEffect(() => {
     fetchClasses()

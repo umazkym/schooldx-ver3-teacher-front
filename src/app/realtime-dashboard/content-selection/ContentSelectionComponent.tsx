@@ -119,7 +119,7 @@ export default function ContentSelectionComponent() {
         setLoading(false);
       }
     })();
-  }, [lessonId, apiBaseUrl]);
+  }, [lessonId]);
 
   const handleStartLesson = async () => {
     if (!lessonId) {

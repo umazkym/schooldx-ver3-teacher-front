@@ -67,6 +67,16 @@ const questionIdToKeyMap: { [id: number]: { status: StudentStringKey, progress: 
   23: { status: 'q4', progress: 'q4Progress' },
 };
 
+// /grades/raw_data のレスポンスアイテムの型定義
+interface RawDataItemFromGrades {
+  student: {
+    student_id: number;
+    students_number: number;
+    name: string;
+  };
+}
+
+
 /**
  * ダッシュボード主要コンポーネント
  */
@@ -139,7 +149,7 @@ function DashboardPageContent() {
         setLessonInfo(d);
       } catch {}
     })();
-  }, [lessonId, apiBaseUrl]);
+  }, [lessonId]);
 
   // 生徒データを API から取得
   useEffect(() => {
@@ -150,7 +160,7 @@ function DashboardPageContent() {
           `${apiBaseUrl}/grades/raw_data?lesson_id=${lessonId}`
         );
         if (!res.ok) return;
-        const data = await res.json();
+        const data: RawDataItemFromGrades[] = await res.json();
 
         // 生徒情報を一意に抽出
         const studentMap = new Map<number, Student>();
@@ -177,7 +187,7 @@ function DashboardPageContent() {
         console.error('Failed to fetch student data:', err);
       }
     })();
-  }, [lessonId, apiBaseUrl]);
+  }, [lessonId]);
 
   const srcDate = lessonInfo ?? lessonMeta;
   const dateInfoQuery = srcDate
@@ -407,7 +417,7 @@ function DashboardPageContent() {
         return { ...student, ...studentUpdate };
       })
     );
-  }, [lessonId, apiBaseUrl, calcIcon, calcProgress]);
+  }, [lessonId, calcIcon, calcProgress]);
 
   useEffect(() => {
     if (!lessonId || !isRunning) return;

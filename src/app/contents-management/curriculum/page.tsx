@@ -134,7 +134,7 @@ export default function CurriculumPage() {
       console.error(err)
       setError(err instanceof Error ? err.message : String(err))
     }
-  }, [apiBaseUrl]);
+  }, []);
 
   useEffect(() => {
     fetchAllData()

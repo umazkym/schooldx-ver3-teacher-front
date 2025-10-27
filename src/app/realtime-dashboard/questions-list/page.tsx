@@ -71,7 +71,7 @@ interface LessonInformation {
         setLessonInfo(d);
       } catch {}
     })();
-  }, [lessonId, apiBaseUrl]);
+  }, [lessonId]);
 
   const dateSrc = lessonInfo ?? lessonMeta;      // ← どちらかあれば OK
   const dateInfo = dateSrc
