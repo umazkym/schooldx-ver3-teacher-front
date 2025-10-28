@@ -182,12 +182,18 @@ function DashboardPageContent() {
           }
         });
 
-        setStudents(Array.from(studentMap.values()));
+        // students_number でソートしてから state にセット
+        const sortedStudents = Array.from(studentMap.values()).sort(
+          (a, b) => a.students_number - b.students_number
+        );
+        setStudents(sortedStudents);
+
       } catch (err) {
         console.error('Failed to fetch student data:', err);
       }
     })();
   }, [lessonId]);
+
 
   const srcDate = lessonInfo ?? lessonMeta;
   const dateInfoQuery = srcDate
@@ -284,7 +290,6 @@ function DashboardPageContent() {
     }
   };
 
-  // ▼▼▼▼▼ ここから変更 ▼▼▼▼▼
   const stopTimer = async () => {
     const themeId = selectedContent?.lesson_theme_id ?? firstTheme?.lesson_theme_id;
 
@@ -311,7 +316,7 @@ function DashboardPageContent() {
         const errorData = await res.json().catch(() => ({ message: res.statusText }));
         throw new Error(errorData.message || `HTTP error ${res.status}`);
       }
-      
+
       const data = await res.json();
       console.log('API Response:', data.message);
 
@@ -329,7 +334,6 @@ function DashboardPageContent() {
       setIsRunning(false);
     }
   };
-  // ▲▲▲▲▲ ここまで変更 ▲▲▲▲▲
 
   const [students, setStudents] = useState<Student[]>([]);
 
@@ -356,19 +360,21 @@ function DashboardPageContent() {
       const diff = d.answer_end_unix - startUnix;
       return Math.min(100, (diff / (defaultMinutes * 60)) * 100);
     }
-    
+
     if (d.answer_status === 1) {
       const nowUnix = Math.floor(Date.now() / 1000);
       const diff = nowUnix - startUnix;
       return Math.min(100, (diff / (defaultMinutes * 60)) * 100);
     }
-    
+
     return 0;
   }, [defaultMinutes]);
 
   const fetchAllStudentsData = useCallback(async () => {
     if (!lessonId || !apiBaseUrl) return;
     const currentStudents = studentsRef.current;
+    if (currentStudents.length === 0) return; // 生徒データがまだない場合は何もしない
+
     const studentIds = currentStudents.map(s => s.id);
 
     const allStudentsData = await Promise.all(
@@ -404,60 +410,66 @@ function DashboardPageContent() {
             if (keys) {
               const statusKey = keys.status;
               const progressKey = keys.progress;
-              
+
               const newProgress = calcProgress(answer);
               const currentProgress = student[progressKey];
 
+              // 解答中でない場合、または解答中で進捗が進んでいる場合のみ更新
               if (answer.answer_status !== 1 || newProgress >= currentProgress) {
                 studentUpdate[progressKey] = newProgress;
               }
               studentUpdate[statusKey] = calcIcon(answer);
           }
         });
+        // 既存の student データと更新データをマージ
         return { ...student, ...studentUpdate };
       })
     );
   }, [lessonId, calcIcon, calcProgress]);
 
-  useEffect(() => {
-    if (!lessonId || !isRunning) return;
 
-    fetchAllStudentsData(); 
+  useEffect(() => {
+    if (!lessonId || !isRunning || students.length === 0) return; // students が空なら実行しない
+
+    fetchAllStudentsData();
     const intervalId = setInterval(fetchAllStudentsData, 5000);
 
     return () => clearInterval(intervalId);
-  }, [lessonId, isRunning, fetchAllStudentsData]);
+  }, [lessonId, isRunning, fetchAllStudentsData, students.length]); // students.length を依存配列に追加
+
 
   useEffect(() => {
     if (!isRunning) return;
 
     const timer = setInterval(() => {
-      setStudents(prevStudents => 
+      setStudents(prevStudents =>
         prevStudents.map(student => {
           const studentUpdate: Partial<Student> = {};
-          
+
           Object.values(questionIdToKeyMap).forEach(keyInfo => {
             const statusKey = keyInfo.status;
             const progressKey = keyInfo.progress;
 
             if (student[statusKey] === 'pencil') {
               const currentProgress = student[progressKey];
+              // 1秒あたりの進捗率を計算
               const increment = 100 / (defaultMinutes * 60);
               const newProgress = Math.min(100, currentProgress + increment);
-              
+
               if (currentProgress !== newProgress) {
                 studentUpdate[progressKey] = newProgress;
               }
             }
           });
-          
+
+          // 更新がある場合のみ新しいオブジェクトを返す
           if (Object.keys(studentUpdate).length > 0) {
               return { ...student, ...studentUpdate };
           }
-          return student;
+          return student; // 更新がない場合は元のオブジェクトを返す
         })
       );
-    }, 1000);
+    }, 1000); // 1秒ごとに実行
 
     return () => clearInterval(timer);
   }, [isRunning, defaultMinutes]);
@@ -482,20 +494,24 @@ function DashboardPageContent() {
 
   function renderIcon(st: string) {
     switch (st) {
-      case "done":
-        return <span className="text-green-600 font-bold">✓</span>;
+      // "done" は使われていないようなのでコメントアウト
+      // case "done":
+      //   return <span className="text-green-600 font-bold">✓</span>;
       case "correct":
         return <span className="text-green-600 font-bold">○</span>;
       case "wrong":
         return <span className="text-red-500 font-bold">×</span>;
       case "pencil":
         return <span className="text-[#555454]">✎</span>;
-      case "checked":
-        return <span className="font-bold text-[#555454]">✓</span>;
+      // "checked" も使われていないようなのでコメントアウト
+      // case "checked":
+      //   return <span className="font-bold text-[#555454]">✓</span>;
       default:
-        return null;
+        // 空白または初期状態を表す場合は何も表示しないか、'-' などを表示
+        return <span className="text-gray-400">-</span>; // 例: 未回答時にハイフン表示
     }
   }
+
 
   function calcQAPercentage(
     arr: Student[],
@@ -508,44 +524,53 @@ function DashboardPageContent() {
       if (st[key] === "wrong") wrongCount++;
     }
     const sum = correctCount + wrongCount;
-    if (sum === 0) return 0;
+    if (sum === 0) return 0; // 回答者がいない場合は0%
     return (correctCount / sum) * 100;
   }
 
+  // 正解・不正解に応じた背景色を返す関数
   function bgColorQA(status: string) {
     if (status === "correct") {
-      return "p-2 border border-[#979191] bg-[#C6EFD0]";
+      return "p-2 border border-[#979191] bg-[#C6EFD0]"; // 正解: 緑背景
     }
     if (status === "wrong") {
-      return "p-2 border border-[#979191] bg-[#FFD0D0]";
+      return "p-2 border border-[#979191] bg-[#FFD0D0]"; // 不正解: 赤背景
     }
+    // デフォルトは白背景
     return "p-2 border border-[#979191] bg-white";
   }
+
 
   function ProgressBarBar({
     color,
     bg,
     percentage,
   }: {
-    color: "green";
+    color: "green"; // 今は緑固定
     bg: "gray" | "red";
     percentage: number;
   }) {
+    // パーセンテージを0-100の範囲に収める
     const clamped = Math.max(0, Math.min(100, percentage));
+
     return (
       <div className="relative h-3 bg-gray-200 rounded-full overflow-hidden mx-2">
-        {bg === "gray" && (
-          <div className="absolute top-0 left-0 w-full h-full bg-[#DBDBDB]" />
-        )}
+        {/* 背景色（不正解部分）*/}
         {bg === "red" && (
-          <div className="absolute top-0 left-0 w-full h-full bg-[#E76568]" />
+          <div className="absolute top-0 left-0 w-full h-full bg-[#E76568]" /> // 赤背景
         )}
+        {/* 背景色（未回答など、今は使われていない）*/}
+        {bg === "gray" && (
+          <div className="absolute top-0 left-0 w-full h-full bg-[#DBDBDB]" /> // グレー背景
+        )}
+        {/* 正解率バー */}
         {color === "green" && (
           <div
-            className="absolute top-0 left-0 h-full bg-[#4CB64B]"
+            className="absolute top-0 left-0 h-full bg-[#4CB64B]" // 緑バー
             style={{ width: `${clamped}%` }}
           />
         )}
+        {/* 中央にパーセンテージ表示 */}
         <div className="absolute w-full h-full flex items-center justify-center text-xs text-white font-bold">
           {Math.round(clamped)}%
         </div>
@@ -553,8 +578,10 @@ function DashboardPageContent() {
      );
   }
 
+
   return (
     <div>
+      {/* 上部: 戻るボタン、タイトル、メッセージ */}
       <div className="flex items-center gap-4 mb-4 justify-between">
         <div>
           <button
@@ -570,11 +597,13 @@ function DashboardPageContent() {
         </div>
       </div>
 
-      <div className="text-gray-600 mb-2 flex justify-between">
+      {/* 授業情報とタイマー */}
+      <div className="text-gray-600 mb-2 flex justify-between items-start">
         <div>
           <div>{dateInfoQuery}</div>
           <div>{contentInfoQuery}</div>
         </div>
+        {/* タイマー表示 */}
         <div
           className="m-4 w-24 h-24 border-4 border-blue-600 rounded-full flex items-center justify-center text-blue-600 text-lg font-bold cursor-pointer hover:opacity-80"
           title="クリックして時間を変更"
@@ -584,16 +613,17 @@ function DashboardPageContent() {
         </div>
       </div>
 
+      {/* 操作ボタン */}
       <div className="flex items-center mb-2 gap-2 justify-end">
         <button
-          className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+          className={`bg-blue-500 text-white px-3 py-1 rounded ${!isLessonStarted || isRunning ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
           onClick={startTimer}
           disabled={!isLessonStarted || isRunning}
         >
           演習開始
         </button>
         <button
-          className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+          className={`bg-blue-500 text-white px-3 py-1 rounded ${!isRunning ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
            onClick={stopTimer}
            disabled={!isRunning}
         >
@@ -604,20 +634,25 @@ function DashboardPageContent() {
         </button>
       </div>
 
+      {/* 生徒一覧テーブル */}
       <div className="overflow-x-auto">
         <table className="border border-[#979191] text-sm min-w-max w-full">
+          {/* テーブルヘッダー */}
           <thead className="bg-white">
             <tr>
+              {/* ▼▼▼ 出席番号のカラムヘッダー ▼▼▼ */}
               <th className="p-2 border border-[#979191]">出席番号</th>
+              {/* ▲▲▲ 変更ここまで ▲▲▲ */}
               <th className="p-2 border border-[#979191]">名前</th>
               <th className="p-2 border border-[#979191]">問題1</th>
               <th className="p-2 border border-[#979191]">問題2</th>
               <th className="p-2 border border-[#979191]">問題3</th>
               <th className="p-2 border border-[#979191]">問題4</th>
             </tr>
+            {/* 正答率バー表示行 */}
             <tr className="bg-white text-xs">
-              <td className="p-1 border border-[#979191] text-center"></td>
-              <td className="p-1 border border-[#979191] text-center"></td>
+              <td className="p-1 border border-[#979191] text-center"></td> {/* 出席番号列は空 */}
+              <td className="p-1 border border-[#979191] text-center"></td> {/* 名前列は空 */}
               <td className="p-1 border border-[#979191]">
                 <ProgressBarBar
                   color="green"
@@ -648,11 +683,15 @@ function DashboardPageContent() {
               </td>
             </tr>
           </thead>
+          {/* テーブルボディ */}
           <tbody>
             {students.map((st) => (
               <tr key={st.id} className="text-center">
+                {/* ▼▼▼ 出席番号を表示するセルを追加 ▼▼▼ */}
                 <td className="p-2 border border-[#979191]">{st.students_number}</td>
+                {/* ▲▲▲ 変更ここまで ▲▲▲ */}
                 <td className="p-2 border border-[#979191]">{st.name}</td>
+                {/* 各問題の解答状況セル */}
                 <td className={bgColorQA(st.q1)}>
                   <CellWithBar icon={st.q1} progress={st.q1Progress} />
                 </td>
