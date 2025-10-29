@@ -564,13 +564,14 @@ function DashboardPageContent() {
   // 修正6: タイマー起動時の初回データ取得とポーリング設定
   useEffect(() => {
     // isRunning が false の時、または生徒リストが未ロードの時は何もしない
-    if (!lessonId || !isRunning || students.length === 0) return; 
+    if (!lessonId || !isRunning || students.length === 0) return;
 
     // 演習開始（isRunning=true）時にまず1回実行
     fetchAllStudentsData();
-    
-    // その後、5秒ごとのポーリングを開始
-    const intervalId = setInterval(fetchAllStudentsData, 5000);
+
+    // その後、1秒ごとのポーリングを開始（リアルタイム更新のため）
+    // 回答中の進捗をリアルタイムで反映するために、APIから最新データを頻繁に取得
+    const intervalId = setInterval(fetchAllStudentsData, 1000);
 
     // クリーンアップ関数
     return () => clearInterval(intervalId);
@@ -600,16 +601,21 @@ function DashboardPageContent() {
             const startUnixKey = keyInfo.startUnix;
 
             // 解答中（status='pencil'）かつanswer_start_unixが設定されている場合のみ更新
-            if (student[statusKey] === 'pencil' && student[startUnixKey] != null && student[startUnixKey] > 0) {
-              const startUnix = student[startUnixKey] as number;
-              const nowUnix = Math.floor(Date.now() / 1000);
-              const diff = nowUnix - startUnix;
-              const newProgress = Math.min(100, (diff / (defaultMinutes * 60)) * 100);
+            if (student[statusKey] === 'pencil') {
+              if (student[startUnixKey] != null && student[startUnixKey] > 0) {
+                const startUnix = student[startUnixKey] as number;
+                const nowUnix = Math.floor(Date.now() / 1000);
+                const diff = nowUnix - startUnix;
+                const newProgress = Math.min(100, (diff / (defaultMinutes * 60)) * 100);
 
-              // 進捗が変わった場合のみ更新
-              if (newProgress !== student[progressKey]) {
-                studentUpdate[progressKey] = newProgress;
-                hasUpdate = true;
+                // 進捗が変わった場合のみ更新
+                if (newProgress !== student[progressKey]) {
+                  studentUpdate[progressKey] = newProgress;
+                  hasUpdate = true;
+                }
+              } else {
+                // デバッグ: startUnixが設定されていない場合
+                console.log(`Student ${student.id} has pencil status but startUnix is not set for ${statusKey}`);
               }
             }
           });
