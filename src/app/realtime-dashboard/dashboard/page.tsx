@@ -1,5 +1,3 @@
-// ファイル: src/app/realtime-dashboard/dashboard/page.tsx
-
 "use client";
 export const dynamic = "force-dynamic";
 
@@ -61,16 +59,6 @@ interface LessonInformation {
   lesson_name: string | null;
   lesson_theme: Record<string, LessonThemeBlock>;
 }
-
-// 修正1: ハードコードされた questionIdToKeyMap を削除します。
-/*
-const questionIdToKeyMap: { [id: number]: { status: StudentStringKey, progress: StudentNumberKey } } = {
-  1: { status: 'q1', progress: 'q1Progress' },
-  2: { status: 'q2', progress: 'q2Progress' },
-  3: { status: 'q3', progress: 'q3Progress' },
-  4: { status: 'q4', progress: 'q4Progress' },
-};
-*/
 
 // /grades/raw_data のレスポンスアイテムの型定義
 interface RawDataItemFromGrades {
@@ -156,13 +144,13 @@ function DashboardPageContent() {
     })();
   }, [lessonId]);
 
-  // 修正2: 生徒データを保持する State と、動的マップ用の State/Ref を定義
+  // 生徒データを保持する State と、動的マップ用の State/Ref を定義
   const [students, setStudents] = useState<Student[]>([]);
   const studentsRef = useRef(students);
   const [dynamicQuestionMap, setDynamicQuestionMap] = useState<{ [id: number]: { status: StudentStringKey, progress: StudentNumberKey } } | null>(null);
   const dynamicQuestionMapRef = useRef(dynamicQuestionMap);
 
-  // 修正3: State が変更されたら Ref にも同期
+  // State が変更されたら Ref にも同期
   useEffect(() => {
     studentsRef.current = students;
   }, [students]);
@@ -171,7 +159,7 @@ function DashboardPageContent() {
   }, [dynamicQuestionMap]);
 
 
-  // 修正4: 生徒リストの初期化処理 (初回ロード時に一度だけ実行)
+  // 生徒リストの初期化処理 (初回ロード時に一度だけ実行)
   useEffect(() => {
     if (!lessonId || !apiBaseUrl) return;
 
@@ -359,7 +347,7 @@ function DashboardPageContent() {
     }
   };
 
-  // calcIcon と calcProgress は変更なし
+
   const calcIcon = useCallback((d?: AnswerDataWithDetails) => {
     if (!d || d.answer_status === 0) return "";
     if (d.answer_status === 1) return "pencil";
@@ -388,7 +376,6 @@ function DashboardPageContent() {
     return 0;
   }, [defaultMinutes]);
 
-  // 修正5: fetchAllStudentsData を修正 (マッピングの動的生成を追加)
   const fetchAllStudentsData = useCallback(async () => {
     if (!lessonId || !apiBaseUrl) return;
     const currentStudents = studentsRef.current;
@@ -435,7 +422,6 @@ function DashboardPageContent() {
         // 取得した問題IDをソートし、q1, q2, q3, q4 に割り当てる
         const sortedQuestionIds = Array.from(questionIds).sort((a, b) => a - b);
         
-        // 生徒側ログ（今回）の `question_id: 5, 6, 7, 8` に対応
         const newMap: { [id: number]: { status: StudentStringKey, progress: StudentNumberKey } } = {};
         const keys: { status: StudentStringKey, progress: StudentNumberKey }[] = [
             { status: 'q1', progress: 'q1Progress' },
@@ -464,8 +450,7 @@ function DashboardPageContent() {
         const studentUpdate: Partial<Student> = {};
 
         result.data.forEach(answer => {
-          // ★★★ 修正箇所 ★★★
-          // ハードコードされたマップの代わりに、動的に生成したマップ(currentMap)を参照する
+          // 動的に生成したマップ(currentMap)を参照する
           const keys = currentMap ? currentMap[answer.question.question_id] : undefined;
           
           if (keys) {
@@ -486,10 +471,11 @@ function DashboardPageContent() {
         return { ...student, ...studentUpdate };
       })
     );
-  }, [lessonId, calcIcon, calcProgress, apiBaseUrl]); // apiBaseUrl を依存配列に追加
+  // 修正: 依存配列から apiBaseUrl を削除 (ログ 489:6)
+  }, [lessonId, calcIcon, calcProgress]);
 
 
-  // 修正6: タイマー起動時の初回データ取得とポーリング設定
+  // タイマー起動時の初回データ取得とポーリング設定
   useEffect(() => {
     // isRunning が false の時、または生徒リストが未ロードの時は何もしない
     if (!lessonId || !isRunning || students.length === 0) return; 
@@ -505,13 +491,12 @@ function DashboardPageContent() {
   }, [lessonId, isRunning, fetchAllStudentsData, students.length]); // students.length を依存配列に追加
 
 
-  // 修正7: リアルタイム進捗バー更新用のuseEffectを修正
+  // リアルタイム進捗バー更新用のuseEffectを修正
   useEffect(() => {
     if (!isRunning) return;
 
     const timer = setInterval(() => {
-      // ★★★ 修正箇所 ★★★
-      // ハードコードされたマップではなく、動的マップ(dynamicQuestionMapRef.current)を参照する
+      // 動的マップ(dynamicQuestionMapRef.current)を参照する
       const currentMap = dynamicQuestionMapRef.current;
       if (!currentMap) return; // マップがまだ生成されていなければ何もしない
 
@@ -549,7 +534,7 @@ function DashboardPageContent() {
     }, 1000); // 1秒ごとに実行
 
     return () => clearInterval(timer);
-  }, [isRunning, defaultMinutes]); // dynamicQuestionMap を依存配列から削除（Ref経由で参照するため）
+  }, [isRunning, defaultMinutes]);
 
 
   function CellWithBar({ icon, progress }: { icon: string; progress: number }) {
@@ -745,7 +730,7 @@ function DashboardPageContent() {
                   percentage={calcQAPercentage(students, "q2")}
                 />
               </td>
-              <td className="p-1 border border-[#979191]">
+              <td className="p-1 border border-[#9T79191]">
                  <ProgressBarBar
                   color="green"
                   bg="red"
