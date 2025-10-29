@@ -17,6 +17,7 @@ interface AnswerDataWithDetails {
   answer_correctness: number | null;
   answer_status: number | null; // 0:未回答, 1:解答中, 2:解答済
   answer_start_unix: number | null;
+  answer_start_timestamp: string | null;  // フォールバック用のタイムスタンプ文字列
   answer_end_unix: number | null;
   question: {
     lesson_question_id: number; // <-- キー名を修正
@@ -334,23 +335,46 @@ function DashboardPageContent() {
     }
   };
 
+  // ヘルパー関数: answer_start_unixまたはanswer_start_timestampからUnixタイムスタンプを取得
+  const getStartUnix = useCallback((d?: AnswerDataWithDetails): number | null => {
+    if (!d) return null;
+
+    // answer_start_unixが設定されていればそれを使用
+    if (d.answer_start_unix != null && d.answer_start_unix > 0) {
+      return d.answer_start_unix;
+    }
+
+    // answer_start_timestampが設定されていればそれを変換して使用
+    if (d.answer_start_timestamp) {
+      try {
+        const date = new Date(d.answer_start_timestamp);
+        return Math.floor(date.getTime() / 1000);
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
+  }, []);
+
   // calcIcon: 解答のステータスに応じたアイコンを返す
-  // answer_start_unixがnullまたは0の場合は、まだ解答を開始していないと判断
+  // answer_start_unixまたはanswer_start_timestampが設定されているかチェック
   const calcIcon = useCallback((d?: AnswerDataWithDetails) => {
     if (!d || d.answer_status === 0) return "";
-    // answer_start_unixがnullまたは0の場合は、まだ解答開始していない
-    if (d.answer_start_unix == null || d.answer_start_unix === 0) return "";
+    // 開始タイムスタンプが設定されていない場合は、まだ解答開始していない
+    const startUnix = getStartUnix(d);
+    if (startUnix == null || startUnix === 0) return "";
     if (d.answer_status === 1) return "pencil";
     if (d.answer_status === 2) {
       if (d.answer_correctness === 0) return "wrong";
       if (d.answer_correctness === 1) return "correct";
     }
     return "";
-  }, []);
+  }, [getStartUnix]);
 
   const calcProgress = useCallback((d?: AnswerDataWithDetails) => {
-    if (!d || d.answer_start_unix == null || d.answer_start_unix === 0) return 0;
-    const startUnix = d.answer_start_unix;
+    const startUnix = getStartUnix(d);
+    if (!d || startUnix == null || startUnix === 0) return 0;
 
     if (d.answer_end_unix != null && d.answer_end_unix > 0) {
       const diff = d.answer_end_unix - startUnix;
@@ -360,12 +384,12 @@ function DashboardPageContent() {
     if (d.answer_status === 1) {
       const nowUnix = Math.floor(Date.now() / 1000);
       const diff = nowUnix - startUnix;
- 
+
       return Math.min(100, (diff / (defaultMinutes * 60)) * 100);
     }
 
     return 0;
-  }, [defaultMinutes]);
+  }, [defaultMinutes, getStartUnix]);
 
   // 修正5: fetchAllStudentsData を修正 (マッピングの動的生成を追加)
   const fetchAllStudentsData = useCallback(async () => {
@@ -470,7 +494,9 @@ function DashboardPageContent() {
               }
 
               // answer_start_unixを保存（リアルタイム進捗バー更新に使用）
-              (studentUpdate as Record<string, number | null>)[startUnixKey] = answer.answer_start_unix;
+              // getStartUnixを使ってanswer_start_unixまたはanswer_start_timestampから取得
+              const startUnixValue = getStartUnix(answer);
+              (studentUpdate as Record<string, number | null>)[startUnixKey] = startUnixValue;
 
               // statusの更新: 一度「正解」または「不正解」になった問題は、statusを変更しない
               const currentStatus = student[statusKey];
@@ -486,7 +512,7 @@ function DashboardPageContent() {
         return { ...student, ...studentUpdate };
       })
     );
-  }, [lessonId, calcIcon, calcProgress, apiBaseUrl]); // apiBaseUrl を依存配列に追加
+  }, [lessonId, calcIcon, calcProgress, getStartUnix, apiBaseUrl]);
 
   // Socket.IOイベントの購読ロジック
   useEffect(() => {
