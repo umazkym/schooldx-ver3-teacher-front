@@ -32,12 +32,16 @@ interface Student {
   // 4問分の解答状況
   q1: string;
   q1Progress: number;
+  q1StartUnix: number | null;
   q2: string;
   q2Progress: number;
+  q2StartUnix: number | null;
   q3: string;
   q3Progress: number;
+  q3StartUnix: number | null;
   q4: string;
   q4Progress: number;
+  q4StartUnix: number | null;
 }
 
 type StudentStringKey = { [K in keyof Student]: Student[K] extends string ? K : never }[keyof Student];
@@ -124,7 +128,13 @@ function DashboardPageContent() {
   // 修正2: 生徒データを保持する State と、動的マップ用の State/Ref を定義
   const [students, setStudents] = useState<Student[]>([]);
   const studentsRef = useRef(students);
-  const [dynamicQuestionMap, setDynamicQuestionMap] = useState<{ [id: number]: { status: StudentStringKey, progress: StudentNumberKey } } | null>(null);
+  const [dynamicQuestionMap, setDynamicQuestionMap] = useState<{
+    [id: number]: {
+      status: StudentStringKey,
+      progress: StudentNumberKey,
+      startUnix: StudentNumberKey | keyof Pick<Student, 'q1StartUnix' | 'q2StartUnix' | 'q3StartUnix' | 'q4StartUnix'>
+    }
+  } | null>(null);
   const dynamicQuestionMapRef = useRef(dynamicQuestionMap);
 
   // 修正3: State が変更されたら Ref にも同期
@@ -158,12 +168,16 @@ function DashboardPageContent() {
               name: item.student.name,
               q1: '',
               q1Progress: 0,
+              q1StartUnix: null,
               q2: '',
               q2Progress: 0,
+              q2StartUnix: null,
               q3: '',
               q3Progress: 0,
+              q3StartUnix: null,
               q4: '',
               q4Progress: 0,
+              q4StartUnix: null,
             });
           }
         });
@@ -401,12 +415,22 @@ function DashboardPageContent() {
         const sortedQuestionIds = Array.from(questionIds).sort((a, b) => a - b);
         
         // 生徒側ログ（今回）の `question_id: 5, 6, 7, 8` に対応
-        const newMap: { [id: number]: { status: StudentStringKey, progress: StudentNumberKey } } = {};
-        const keys: { status: StudentStringKey, progress: StudentNumberKey }[] = [
-            { status: 'q1', progress: 'q1Progress' },
-            { status: 'q2', progress: 'q2Progress' },
-            { status: 'q3', progress: 'q3Progress' },
-            { status: 'q4', progress: 'q4Progress' },
+        const newMap: {
+          [id: number]: {
+            status: StudentStringKey,
+            progress: StudentNumberKey,
+            startUnix: keyof Pick<Student, 'q1StartUnix' | 'q2StartUnix' | 'q3StartUnix' | 'q4StartUnix'>
+          }
+        } = {};
+        const keys: {
+          status: StudentStringKey,
+          progress: StudentNumberKey,
+          startUnix: keyof Pick<Student, 'q1StartUnix' | 'q2StartUnix' | 'q3StartUnix' | 'q4StartUnix'>
+        }[] = [
+            { status: 'q1', progress: 'q1Progress', startUnix: 'q1StartUnix' },
+            { status: 'q2', progress: 'q2Progress', startUnix: 'q2StartUnix' },
+            { status: 'q3', progress: 'q3Progress', startUnix: 'q3StartUnix' },
+            { status: 'q4', progress: 'q4Progress', startUnix: 'q4StartUnix' },
         ];
         sortedQuestionIds.slice(0, 4).forEach((qId, index) => {
             newMap[qId] = keys[index];
@@ -431,10 +455,11 @@ function DashboardPageContent() {
           // ★★★ 修正箇所 ★★★
           // ハードコードされたマップの代わりに、動的に生成したマップ(currentMap)を参照する
           const keys = currentMap ? currentMap[answer.question.lesson_question_id] : undefined;
-          
+
           if (keys) {
               const statusKey = keys.status;
               const progressKey = keys.progress;
+              const startUnixKey = keys.startUnix;
 
               const newProgress = calcProgress(answer);
               const currentProgress = student[progressKey];
@@ -443,7 +468,18 @@ function DashboardPageContent() {
               if (answer.answer_status !== 1 || newProgress >= currentProgress) {
                 studentUpdate[progressKey] = newProgress;
               }
-              studentUpdate[statusKey] = calcIcon(answer);
+
+              // answer_start_unixを保存（リアルタイム進捗バー更新に使用）
+              (studentUpdate as Record<string, number | null>)[startUnixKey] = answer.answer_start_unix;
+
+              // statusの更新: 一度「正解」または「不正解」になった問題は、statusを変更しない
+              const currentStatus = student[statusKey];
+              const newStatus = calcIcon(answer);
+
+              // 現在のstatusが「correct」または「wrong」の場合は、新しいstatusに上書きしない
+              if (currentStatus !== 'correct' && currentStatus !== 'wrong') {
+                studentUpdate[statusKey] = newStatus;
+              }
           }
         });
         // 既存の student データと更新データをマージ
@@ -515,10 +551,51 @@ function DashboardPageContent() {
   }, [lessonId, isRunning, fetchAllStudentsData, students.length]); // ★ fetchAllStudentsData, students.length を依存配列に追加
 
 
-  // リアルタイム進捗バー更新は、fetchAllStudentsDataのポーリング（5秒ごと）で
-  // 最新のデータを取得し、その都度calcProgressで進捗を再計算する。
-  // calcProgressは現在時刻とanswer_start_unixの差分から進捗を計算するため、
-  // ポーリングのたびに最新の進捗が表示される。
+  // リアルタイム進捗バー更新: 解答中（status='pencil'）の問題の進捗をリアルタイムに更新
+  useEffect(() => {
+    if (!isRunning) return;
+
+    const timer = setInterval(() => {
+      const currentMap = dynamicQuestionMapRef.current;
+      if (!currentMap) return;
+
+      setStudents(prevStudents =>
+        prevStudents.map(student => {
+          const studentUpdate: Partial<Student> = {};
+          let hasUpdate = false;
+
+          // 動的マップのキー（問題ID）に基づいて処理
+          Object.keys(currentMap).forEach(questionIdStr => {
+            const qId = parseInt(questionIdStr, 10);
+            const keyInfo = currentMap[qId];
+
+            const statusKey = keyInfo.status;
+            const progressKey = keyInfo.progress;
+            const startUnixKey = keyInfo.startUnix;
+
+            // 解答中（status='pencil'）かつanswer_start_unixが設定されている場合のみ更新
+            if (student[statusKey] === 'pencil' && student[startUnixKey] != null && student[startUnixKey] > 0) {
+              const startUnix = student[startUnixKey] as number;
+              const nowUnix = Math.floor(Date.now() / 1000);
+              const diff = nowUnix - startUnix;
+              const newProgress = Math.min(100, (diff / (defaultMinutes * 60)) * 100);
+
+              // 進捗が変わった場合のみ更新
+              if (newProgress !== student[progressKey]) {
+                studentUpdate[progressKey] = newProgress;
+                hasUpdate = true;
+              }
+            }
+          });
+
+          // 更新がある場合のみ新しいオブジェクトを返す
+          return hasUpdate ? { ...student, ...studentUpdate } : student;
+        })
+      );
+    }, 1000); // 1秒ごとに実行
+
+    return () => clearInterval(timer);
+  }, [isRunning, defaultMinutes]);
 
 
   function CellWithBar({ icon, progress }: { icon: string; progress: number }) {
