@@ -1,9 +1,11 @@
+// ファイル: src/app/realtime-dashboard/dashboard/page.tsx
+
 "use client";
 export const dynamic = "force-dynamic";
 
 import React, { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Socket } from "socket.io-client";
+import { Socket } from "socket-io-client";
 import { getSocket } from "@/lib/socket";
 import { apiBaseUrl } from '@/lib/apiConfig';
 
@@ -60,12 +62,15 @@ interface LessonInformation {
   lesson_theme: Record<string, LessonThemeBlock>;
 }
 
+// 修正1: ハードコードされた questionIdToKeyMap を削除します。
+/*
 const questionIdToKeyMap: { [id: number]: { status: StudentStringKey, progress: StudentNumberKey } } = {
   1: { status: 'q1', progress: 'q1Progress' },
   2: { status: 'q2', progress: 'q2Progress' },
   3: { status: 'q3', progress: 'q3Progress' },
   4: { status: 'q4', progress: 'q4Progress' },
 };
+*/
 
 // /grades/raw_data のレスポンスアイテムの型定義
 interface RawDataItemFromGrades {
@@ -151,15 +156,32 @@ function DashboardPageContent() {
     })();
   }, [lessonId]);
 
-  // 生徒データを API から取得
+  // 修正2: 生徒データを保持する State と、動的マップ用の State/Ref を定義
+  const [students, setStudents] = useState<Student[]>([]);
+  const studentsRef = useRef(students);
+  const [dynamicQuestionMap, setDynamicQuestionMap] = useState<{ [id: number]: { status: StudentStringKey, progress: StudentNumberKey } } | null>(null);
+  const dynamicQuestionMapRef = useRef(dynamicQuestionMap);
+
+  // 修正3: State が変更されたら Ref にも同期
+  useEffect(() => {
+    studentsRef.current = students;
+  }, [students]);
+  useEffect(() => {
+    dynamicQuestionMapRef.current = dynamicQuestionMap;
+  }, [dynamicQuestionMap]);
+
+
+  // 修正4: 生徒リストの初期化処理 (初回ロード時に一度だけ実行)
   useEffect(() => {
     if (!lessonId || !apiBaseUrl) return;
-    (async () => {
+
+    // 生徒リストを取得する非同期関数
+    const initializeStudents = async () => {
       try {
         const res = await fetch(
           `${apiBaseUrl}/grades/raw_data?lesson_id=${lessonId}`
         );
-        if (!res.ok) return;
+        if (!res.ok) throw new Error('Failed to fetch student list');
         const data: RawDataItemFromGrades[] = await res.json();
 
         // 生徒情報を一意に抽出
@@ -186,13 +208,15 @@ function DashboardPageContent() {
         const sortedStudents = Array.from(studentMap.values()).sort(
           (a, b) => a.students_number - b.students_number
         );
-        setStudents(sortedStudents);
+        setStudents(sortedStudents); // 生徒リストをセット
 
       } catch (err) {
         console.error('Failed to fetch student data:', err);
       }
-    })();
-  }, [lessonId]);
+    };
+
+    initializeStudents();
+  }, [lessonId]); // lessonId が変わったときだけ実行
 
 
   const srcDate = lessonInfo ?? lessonMeta;
@@ -335,13 +359,7 @@ function DashboardPageContent() {
     }
   };
 
-  const [students, setStudents] = useState<Student[]>([]);
-
-  const studentsRef = useRef(students);
-  useEffect(() => {
-    studentsRef.current = students;
-  }, [students]);
-
+  // calcIcon と calcProgress は変更なし
   const calcIcon = useCallback((d?: AnswerDataWithDetails) => {
     if (!d || d.answer_status === 0) return "";
     if (d.answer_status === 1) return "pencil";
@@ -370,13 +388,18 @@ function DashboardPageContent() {
     return 0;
   }, [defaultMinutes]);
 
+  // 修正5: fetchAllStudentsData を修正 (マッピングの動的生成を追加)
   const fetchAllStudentsData = useCallback(async () => {
     if (!lessonId || !apiBaseUrl) return;
     const currentStudents = studentsRef.current;
-    if (currentStudents.length === 0) return; // 生徒データがまだない場合は何もしない
+    if (currentStudents.length === 0) {
+      // console.log("生徒データがまだロードされていません。スキップします。");
+      return; // 生徒データがまだない場合は何もしない
+    }
 
     const studentIds = currentStudents.map(s => s.id);
 
+    // (A) 全生徒の回答データを取得 (既存ロジック)
     const allStudentsData = await Promise.all(
       studentIds.map(async (studentId) => {
         try {
@@ -396,6 +419,41 @@ function DashboardPageContent() {
       })
     );
 
+    // (B) マッピングの決定
+    let currentMap = dynamicQuestionMapRef.current;
+    if (!currentMap) {
+        // マップがまだない場合、取得したデータから動的に生成する
+        const questionIds = new Set<number>();
+        allStudentsData.forEach(result => {
+            if (result.data) {
+                result.data.forEach(answer => {
+                    questionIds.add(answer.question.question_id);
+                });
+            }
+        });
+        
+        // 取得した問題IDをソートし、q1, q2, q3, q4 に割り当てる
+        const sortedQuestionIds = Array.from(questionIds).sort((a, b) => a - b);
+        
+        // 生徒側ログ（今回）の `question_id: 5, 6, 7, 8` に対応
+        const newMap: { [id: number]: { status: StudentStringKey, progress: StudentNumberKey } } = {};
+        const keys: { status: StudentStringKey, progress: StudentNumberKey }[] = [
+            { status: 'q1', progress: 'q1Progress' },
+            { status: 'q2', progress: 'q2Progress' },
+            { status: 'q3', progress: 'q3Progress' },
+            { status: 'q4', progress: 'q4Progress' },
+        ];
+        
+        sortedQuestionIds.slice(0, 4).forEach((qId, index) => {
+            newMap[qId] = keys[index];
+        });
+        
+        console.log("動的マッピングを生成:", newMap);
+        setDynamicQuestionMap(newMap); // Stateを更新
+        currentMap = newMap; // この実行サイクルでは更新された Ref の代わりにローカル変数を使う
+    }
+
+    // (C) 画面更新 (既存ロジックだが、参照するマップを変更)
     setStudents(prevStudents =>
       prevStudents.map(student => {
         const result = allStudentsData.find(d => d.studentId === student.id);
@@ -406,8 +464,11 @@ function DashboardPageContent() {
         const studentUpdate: Partial<Student> = {};
 
         result.data.forEach(answer => {
-          const keys = questionIdToKeyMap[answer.question.question_id];
-            if (keys) {
+          // ★★★ 修正箇所 ★★★
+          // ハードコードされたマップの代わりに、動的に生成したマップ(currentMap)を参照する
+          const keys = currentMap ? currentMap[answer.question.question_id] : undefined;
+          
+          if (keys) {
               const statusKey = keys.status;
               const progressKey = keys.progress;
 
@@ -425,31 +486,47 @@ function DashboardPageContent() {
         return { ...student, ...studentUpdate };
       })
     );
-  }, [lessonId, calcIcon, calcProgress]);
+  }, [lessonId, calcIcon, calcProgress, apiBaseUrl]); // apiBaseUrl を依存配列に追加
 
 
+  // 修正6: タイマー起動時の初回データ取得とポーリング設定
   useEffect(() => {
-    if (!lessonId || !isRunning || students.length === 0) return; // students が空なら実行しない
+    // isRunning が false の時、または生徒リストが未ロードの時は何もしない
+    if (!lessonId || !isRunning || students.length === 0) return; 
 
+    // 演習開始（isRunning=true）時にまず1回実行
     fetchAllStudentsData();
+    
+    // その後、5秒ごとのポーリングを開始
     const intervalId = setInterval(fetchAllStudentsData, 5000);
 
+    // クリーンアップ関数
     return () => clearInterval(intervalId);
   }, [lessonId, isRunning, fetchAllStudentsData, students.length]); // students.length を依存配列に追加
 
 
+  // 修正7: リアルタイム進捗バー更新用のuseEffectを修正
   useEffect(() => {
     if (!isRunning) return;
 
     const timer = setInterval(() => {
+      // ★★★ 修正箇所 ★★★
+      // ハードコードされたマップではなく、動的マップ(dynamicQuestionMapRef.current)を参照する
+      const currentMap = dynamicQuestionMapRef.current;
+      if (!currentMap) return; // マップがまだ生成されていなければ何もしない
+
       setStudents(prevStudents =>
         prevStudents.map(student => {
           const studentUpdate: Partial<Student> = {};
 
-          Object.values(questionIdToKeyMap).forEach(keyInfo => {
+          // 動的マップのキー（問題ID）に基づいて処理
+          Object.keys(currentMap).forEach(questionIdStr => {
+            const qId = parseInt(questionIdStr, 10);
+            const keyInfo = currentMap[qId];
+            
             const statusKey = keyInfo.status;
             const progressKey = keyInfo.progress;
-
+            
             if (student[statusKey] === 'pencil') {
               const currentProgress = student[progressKey];
               // 1秒あたりの進捗率を計算
@@ -472,7 +549,8 @@ function DashboardPageContent() {
     }, 1000); // 1秒ごとに実行
 
     return () => clearInterval(timer);
-  }, [isRunning, defaultMinutes]);
+  }, [isRunning, defaultMinutes]); // dynamicQuestionMap を依存配列から削除（Ref経由で参照するため）
+
 
   function CellWithBar({ icon, progress }: { icon: string; progress: number }) {
     const pct = Math.max(0, Math.min(100, progress));
@@ -600,7 +678,7 @@ function DashboardPageContent() {
       {/* 授業情報とタイマー */}
       <div className="text-gray-600 mb-2 flex justify-between items-start">
         <div>
-          <div>{dateInfoQuery}</div>
+           <div>{dateInfoQuery}</div>
           <div>{contentInfoQuery}</div>
         </div>
         {/* タイマー表示 */}
@@ -635,7 +713,7 @@ function DashboardPageContent() {
       </div>
 
       {/* 生徒一覧テーブル */}
-      <div className="overflow-x-auto">
+       <div className="overflow-x-auto">
         <table className="border border-[#979191] text-sm min-w-max w-full">
           {/* テーブルヘッダー */}
           <thead className="bg-white">
@@ -678,7 +756,7 @@ function DashboardPageContent() {
                 <ProgressBarBar
                   color="green"
                   bg="red"
-                  percentage={calcQAPercentage(students, "q4")}
+                   percentage={calcQAPercentage(students, "q4")}
                 />
               </td>
             </tr>
