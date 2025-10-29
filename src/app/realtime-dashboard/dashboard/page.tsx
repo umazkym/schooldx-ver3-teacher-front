@@ -61,10 +61,10 @@ interface LessonInformation {
 }
 
 const questionIdToKeyMap: { [id: number]: { status: StudentStringKey, progress: StudentNumberKey } } = {
-  15: { status: 'q1', progress: 'q1Progress' },
-  17: { status: 'q2', progress: 'q2Progress' },
-  20: { status: 'q3', progress: 'q3Progress' },
-  23: { status: 'q4', progress: 'q4Progress' },
+  1: { status: 'q1', progress: 'q1Progress' },
+  2: { status: 'q2', progress: 'q2Progress' },
+  3: { status: 'q3', progress: 'q3Progress' },
+  4: { status: 'q4', progress: 'q4Progress' },
 };
 
 // /grades/raw_data のレスポンスアイテムの型定義
