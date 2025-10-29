@@ -320,9 +320,12 @@ function DashboardPageContent() {
     }
   };
 
-  // calcIcon と calcProgress は変更なし
+  // calcIcon: 解答のステータスに応じたアイコンを返す
+  // answer_start_unixがnullまたは0の場合は、まだ解答を開始していないと判断
   const calcIcon = useCallback((d?: AnswerDataWithDetails) => {
     if (!d || d.answer_status === 0) return "";
+    // answer_start_unixがnullまたは0の場合は、まだ解答開始していない
+    if (d.answer_start_unix == null || d.answer_start_unix === 0) return "";
     if (d.answer_status === 1) return "pencil";
     if (d.answer_status === 2) {
       if (d.answer_correctness === 0) return "wrong";
@@ -512,51 +515,10 @@ function DashboardPageContent() {
   }, [lessonId, isRunning, fetchAllStudentsData, students.length]); // ★ fetchAllStudentsData, students.length を依存配列に追加
 
 
-  // 修正7: リアルタイム進捗バー更新用のuseEffectを修正
-  useEffect(() => {
-    if (!isRunning) return;
-
-    const timer = setInterval(() => {
-      // ★★★ 修正箇所 ★★★
-      // ハードコードされたマップではなく、動的マップ(dynamicQuestionMapRef.current)を参照する
-      const currentMap = dynamicQuestionMapRef.current;
-      if (!currentMap) return; // マップがまだ生成されていなければ何もしない
-
-      setStudents(prevStudents =>
-        prevStudents.map(student => {
-          const studentUpdate: Partial<Student> = {};
-
-          // 動的マップのキー（問題ID）に基づいて処理
-          Object.keys(currentMap).forEach(questionIdStr => {
-            const qId = parseInt(questionIdStr, 10);
-            const keyInfo = currentMap[qId];
-            
-            const statusKey = keyInfo.status;
-            const progressKey = keyInfo.progress;
-            
-            if (student[statusKey] === 'pencil') {
-              const currentProgress = student[progressKey];
-              // 1秒あたりの進捗率を計算
-              const increment = 100 / (defaultMinutes * 60);
-              const newProgress = Math.min(100, currentProgress + increment);
-
-              if (currentProgress !== newProgress) {
-                studentUpdate[progressKey] = newProgress;
-              }
-            }
-          });
-
-          // 更新がある場合のみ新しいオブジェクトを返す
-          if (Object.keys(studentUpdate).length > 0) {
-              return { ...student, ...studentUpdate };
-          }
-          return student; // 更新がない場合は元のオブジェクトを返す
-        })
-      );
-    }, 1000); // 1秒ごとに実行
-
-    return () => clearInterval(timer);
-  }, [isRunning, defaultMinutes]); // ★ dynamicQuestionMap を依存配列から削除（Ref経由で参照するため）
+  // リアルタイム進捗バー更新は、fetchAllStudentsDataのポーリング（5秒ごと）で
+  // 最新のデータを取得し、その都度calcProgressで進捗を再計算する。
+  // calcProgressは現在時刻とanswer_start_unixの差分から進捗を計算するため、
+  // ポーリングのたびに最新の進捗が表示される。
 
 
   function CellWithBar({ icon, progress }: { icon: string; progress: number }) {
