@@ -1,6 +1,7 @@
+// ファイル: src/app/realtime-dashboard/dashboard/page.tsx
+
 "use client";
 export const dynamic = "force-dynamic";
-
 import React, { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Socket } from "socket-io-client";
@@ -78,6 +79,7 @@ function DashboardPageContent() {
 
   const socketRef = useRef<Socket | null>(null);
 
+  // ★ Socket.IOイベントの購読ロジックを修正
   useEffect(() => {
     const socket = getSocket();
     socketRef.current = socket;
@@ -86,25 +88,48 @@ function DashboardPageContent() {
       socket.connect();
     }
 
+    const handleSocketMessage = (data: string) => {
+      console.log("🌐 Web recv from Flutter:", data);
+      
+      // バックエンドから 'student_answered,lessonId,studentId,answerDataId' 形式で飛んでくる
+      const parts = data.split(',');
+      const eventType = parts[0];
+
+      // ★ イベントタイプをチェック
+      if (eventType === 'student_answered') {
+        const receivedLessonId = parseInt(parts[1], 10);
+        
+        // 現在開いているダッシュボードの授業IDと一致する場合のみデータを再取得
+        if (receivedLessonId === lessonId) {
+          console.log(`Matching answer update received for lesson ${lessonId}. Refetching data.`);
+          // ★ ポーリングを待たずに即時データ取得を実行
+          fetchAllStudentsData();
+        } else {
+          console.log(`Ignoring answer update for different lesson: ${receivedLessonId}`);
+        }
+      }
+      
+      // 他のイベントタイプ（例：'student_question'など）もここで処理できる
+    };
+
     socket.on("connect", () =>
       console.log("🌐 Web connected (Dashboard)")
     );
-    socket.on("from_flutter", (data) =>
-      console.log("🌐 Web recv from Flutter:", data)
-    );
+    
+    socket.on("from_flutter", handleSocketMessage);
 
     return () => {
-        if (socketRef.current) {
-            socketRef.current.off("connect");
-            socketRef.current.off("from_flutter");
-        }
+      if (socketRef.current) {
+        socketRef.current.off("connect");
+        socketRef.current.off("from_flutter", handleSocketMessage);
+      }
     };
-  }, []);
+  }, [fetchAllStudentsData, lessonId]); // ★ fetchAllStudentsData, lessonId を依存配列に追加
+
 
   const searchParams = useSearchParams();
   const lessonIdStr = searchParams.get("lesson_id");
   const lessonId = lessonIdStr ? parseInt(lessonIdStr, 10) : null;
-
   const [lessonInfo, setLessonInfo] = useState<LessonInformation | null>(null);
   const [lessonMeta] = useState<{
     date: string;
@@ -120,7 +145,6 @@ function DashboardPageContent() {
       return null;
     }
   });
-
   const [selectedContent, setSelectedContent] = useState<LessonThemeBlock | null>(null);
 
   useEffect(() => {
@@ -129,7 +153,6 @@ function DashboardPageContent() {
       if (s) setSelectedContent(JSON.parse(s));
     } catch {}
   }, []);
-
   useEffect(() => {
     if (!lessonId || !apiBaseUrl) return;
     (async () => {
@@ -142,15 +165,16 @@ function DashboardPageContent() {
         setLessonInfo(d);
       } catch {}
     })();
+  
   }, [lessonId]);
 
-  // 生徒データを保持する State と、動的マップ用の State/Ref を定義
+  // 修正2: 生徒データを保持する State と、動的マップ用の State/Ref を定義
   const [students, setStudents] = useState<Student[]>([]);
   const studentsRef = useRef(students);
   const [dynamicQuestionMap, setDynamicQuestionMap] = useState<{ [id: number]: { status: StudentStringKey, progress: StudentNumberKey } } | null>(null);
   const dynamicQuestionMapRef = useRef(dynamicQuestionMap);
 
-  // State が変更されたら Ref にも同期
+  // 修正3: State が変更されたら Ref にも同期
   useEffect(() => {
     studentsRef.current = students;
   }, [students]);
@@ -158,8 +182,7 @@ function DashboardPageContent() {
     dynamicQuestionMapRef.current = dynamicQuestionMap;
   }, [dynamicQuestionMap]);
 
-
-  // 生徒リストの初期化処理 (初回ロード時に一度だけ実行)
+  // 修正4: 生徒リストの初期化処理 (初回ロード時に一度だけ実行)
   useEffect(() => {
     if (!lessonId || !apiBaseUrl) return;
 
@@ -211,11 +234,11 @@ function DashboardPageContent() {
   const dateInfoQuery = srcDate
     ? `${srcDate.date} (${srcDate.day_of_week}) / ${srcDate.period}限目 ${srcDate.lesson_name ?? ""}`
     : "ロード中...";
-
   const firstTheme = lessonInfo ? Object.values(lessonInfo.lesson_theme)[0] : undefined;
   const src = selectedContent ?? firstTheme;
   const contentInfoQuery = src
-    ? `${src.lesson_theme_name} / ${src.material_name} ${src.part_name ?? ""} ${src.chapter_name ?? ""} ${src.unit_name ?? ""}`.trim()
+    ? `${src.lesson_theme_name} / ${src.material_name} ${src.part_name ?? ""} ${src.chapter_name ?? ""} ${src.unit_name ??
+ ""}`.trim()
     : "";
   const timerQuery = searchParams.get("timer") || "5";
 
@@ -281,7 +304,6 @@ function DashboardPageContent() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
       });
-
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: res.statusText }));
         throw new Error(errorData.message || `HTTP error ${res.status}`);
@@ -294,7 +316,6 @@ function DashboardPageContent() {
       const msg = `exercise_start,${themeId}`;
       socketRef.current?.emit("to_flutter", msg);
       console.log("🌐 Web send to server →", msg);
-
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       alert(`演習開始に失敗しました: ${errorMessage}`);
@@ -303,7 +324,8 @@ function DashboardPageContent() {
   };
 
   const stopTimer = async () => {
-    const themeId = selectedContent?.lesson_theme_id ?? firstTheme?.lesson_theme_id;
+    const themeId = selectedContent?.lesson_theme_id ??
+      firstTheme?.lesson_theme_id;
 
     if (!themeId) {
       alert("演習のテーマIDが見つかりません。");
@@ -323,7 +345,6 @@ function DashboardPageContent() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
       });
-
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: res.statusText }));
         throw new Error(errorData.message || `HTTP error ${res.status}`);
@@ -337,7 +358,6 @@ function DashboardPageContent() {
       const message = `exercise_end,${themeId}`; // 新しいメッセージ形式
       socketRef.current?.emit("to_flutter", message);
       console.log("🌐 Web send to server →", message);
-
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       alert(`演習終了に失敗しました: ${errorMessage}`);
@@ -347,7 +367,7 @@ function DashboardPageContent() {
     }
   };
 
-
+  // calcIcon と calcProgress は変更なし
   const calcIcon = useCallback((d?: AnswerDataWithDetails) => {
     if (!d || d.answer_status === 0) return "";
     if (d.answer_status === 1) return "pencil";
@@ -370,12 +390,14 @@ function DashboardPageContent() {
     if (d.answer_status === 1) {
       const nowUnix = Math.floor(Date.now() / 1000);
       const diff = nowUnix - startUnix;
+ 
       return Math.min(100, (diff / (defaultMinutes * 60)) * 100);
     }
 
     return 0;
   }, [defaultMinutes]);
 
+  // 修正5: fetchAllStudentsData を修正 (マッピングの動的生成を追加)
   const fetchAllStudentsData = useCallback(async () => {
     if (!lessonId || !apiBaseUrl) return;
     const currentStudents = studentsRef.current;
@@ -418,10 +440,11 @@ function DashboardPageContent() {
                 });
             }
         });
-        
+
         // 取得した問題IDをソートし、q1, q2, q3, q4 に割り当てる
         const sortedQuestionIds = Array.from(questionIds).sort((a, b) => a - b);
         
+        // 生徒側ログ（今回）の `question_id: 5, 6, 7, 8` に対応
         const newMap: { [id: number]: { status: StudentStringKey, progress: StudentNumberKey } } = {};
         const keys: { status: StudentStringKey, progress: StudentNumberKey }[] = [
             { status: 'q1', progress: 'q1Progress' },
@@ -429,14 +452,13 @@ function DashboardPageContent() {
             { status: 'q3', progress: 'q3Progress' },
             { status: 'q4', progress: 'q4Progress' },
         ];
-        
         sortedQuestionIds.slice(0, 4).forEach((qId, index) => {
             newMap[qId] = keys[index];
         });
-        
         console.log("動的マッピングを生成:", newMap);
         setDynamicQuestionMap(newMap); // Stateを更新
-        currentMap = newMap; // この実行サイクルでは更新された Ref の代わりにローカル変数を使う
+        currentMap = newMap; 
+        // この実行サイクルでは更新された Ref の代わりにローカル変数を使う
     }
 
     // (C) 画面更新 (既存ロジックだが、参照するマップを変更)
@@ -450,7 +472,8 @@ function DashboardPageContent() {
         const studentUpdate: Partial<Student> = {};
 
         result.data.forEach(answer => {
-          // 動的に生成したマップ(currentMap)を参照する
+          // ★★★ 修正箇所 ★★★
+          // ハードコードされたマップの代わりに、動的に生成したマップ(currentMap)を参照する
           const keys = currentMap ? currentMap[answer.question.question_id] : undefined;
           
           if (keys) {
@@ -471,11 +494,10 @@ function DashboardPageContent() {
         return { ...student, ...studentUpdate };
       })
     );
-  // 修正: 依存配列から apiBaseUrl を削除 (ログ 489:6)
-  }, [lessonId, calcIcon, calcProgress]);
+  }, [lessonId, calcIcon, calcProgress, apiBaseUrl]); // apiBaseUrl を依存配列に追加
 
 
-  // タイマー起動時の初回データ取得とポーリング設定
+  // 修正6: タイマー起動時の初回データ取得とポーリング設定
   useEffect(() => {
     // isRunning が false の時、または生徒リストが未ロードの時は何もしない
     if (!lessonId || !isRunning || students.length === 0) return; 
@@ -488,15 +510,16 @@ function DashboardPageContent() {
 
     // クリーンアップ関数
     return () => clearInterval(intervalId);
-  }, [lessonId, isRunning, fetchAllStudentsData, students.length]); // students.length を依存配列に追加
+  }, [lessonId, isRunning, fetchAllStudentsData, students.length]); // ★ fetchAllStudentsData, students.length を依存配列に追加
 
 
-  // リアルタイム進捗バー更新用のuseEffectを修正
+  // 修正7: リアルタイム進捗バー更新用のuseEffectを修正
   useEffect(() => {
     if (!isRunning) return;
 
     const timer = setInterval(() => {
-      // 動的マップ(dynamicQuestionMapRef.current)を参照する
+      // ★★★ 修正箇所 ★★★
+      // ハードコードされたマップではなく、動的マップ(dynamicQuestionMapRef.current)を参照する
       const currentMap = dynamicQuestionMapRef.current;
       if (!currentMap) return; // マップがまだ生成されていなければ何もしない
 
@@ -534,7 +557,7 @@ function DashboardPageContent() {
     }, 1000); // 1秒ごとに実行
 
     return () => clearInterval(timer);
-  }, [isRunning, defaultMinutes]);
+  }, [isRunning, defaultMinutes]); // ★ dynamicQuestionMap を依存配列から削除（Ref経由で参照するため）
 
 
   function CellWithBar({ icon, progress }: { icon: string; progress: number }) {
@@ -615,7 +638,6 @@ function DashboardPageContent() {
   }) {
     // パーセンテージを0-100の範囲に収める
     const clamped = Math.max(0, Math.min(100, percentage));
-
     return (
       <div className="relative h-3 bg-gray-200 rounded-full overflow-hidden mx-2">
         {/* 背景色（不正解部分）*/}
@@ -633,6 +655,7 @@ function DashboardPageContent() {
             style={{ width: `${clamped}%` }}
           />
         )}
+        
         {/* 中央にパーセンテージ表示 */}
         <div className="absolute w-full h-full flex items-center justify-center text-xs text-white font-bold">
           {Math.round(clamped)}%
@@ -663,7 +686,7 @@ function DashboardPageContent() {
       {/* 授業情報とタイマー */}
       <div className="text-gray-600 mb-2 flex justify-between items-start">
         <div>
-           <div>{dateInfoQuery}</div>
+            <div>{dateInfoQuery}</div>
           <div>{contentInfoQuery}</div>
         </div>
         {/* タイマー表示 */}
@@ -672,21 +695,24 @@ function DashboardPageContent() {
           title="クリックして時間を変更"
           onClick={handleChangeTimer}
         >
-           {timeStr}
+          {timeStr}
         </div>
       </div>
 
       {/* 操作ボタン */}
       <div className="flex items-center mb-2 gap-2 justify-end">
         <button
-          className={`bg-blue-500 text-white px-3 py-1 rounded ${!isLessonStarted || isRunning ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
+          className={`bg-blue-500 text-white px-3 py-1 rounded ${!isLessonStarted ||
+ isRunning ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
           onClick={startTimer}
-          disabled={!isLessonStarted || isRunning}
+          disabled={!isLessonStarted ||
+ isRunning}
         >
           演習開始
         </button>
         <button
-          className={`bg-blue-500 text-white px-3 py-1 rounded ${!isRunning ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
+          className={`bg-blue-500 text-white px-3 py-1 rounded ${!isRunning ?
+ 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
            onClick={stopTimer}
            disabled={!isRunning}
         >
@@ -698,7 +724,7 @@ function DashboardPageContent() {
       </div>
 
       {/* 生徒一覧テーブル */}
-       <div className="overflow-x-auto">
+        <div className="overflow-x-auto">
         <table className="border border-[#979191] text-sm min-w-max w-full">
           {/* テーブルヘッダー */}
           <thead className="bg-white">
@@ -730,7 +756,7 @@ function DashboardPageContent() {
                   percentage={calcQAPercentage(students, "q2")}
                 />
               </td>
-              <td className="p-1 border border-[#9T79191]">
+              <td className="p-1 border border-[#979191]">
                  <ProgressBarBar
                   color="green"
                   bg="red"
@@ -741,7 +767,7 @@ function DashboardPageContent() {
                 <ProgressBarBar
                   color="green"
                   bg="red"
-                   percentage={calcQAPercentage(students, "q4")}
+                  percentage={calcQAPercentage(students, "q4")}
                 />
               </td>
             </tr>
@@ -759,7 +785,7 @@ function DashboardPageContent() {
                   <CellWithBar icon={st.q1} progress={st.q1Progress} />
                 </td>
                 <td className={bgColorQA(st.q2)}>
-                  <CellWithBar icon={st.q2} progress={st.q2Progress} />
+                   <CellWithBar icon={st.q2} progress={st.q2Progress} />
                 </td>
                 <td className={bgColorQA(st.q3)}>
                   <CellWithBar

@@ -72,6 +72,7 @@ const getCurrentAcademicYear = (): number => {
 
 export default function GradesPage() {
     const router = useRouter();
+
     // --- State管理 ---
     const [classes, setClasses] = useState<ClassData[]>([]);
     const [selectedClassId, setSelectedClassId] = useState<string>("");
@@ -82,6 +83,7 @@ export default function GradesPage() {
     const [gradeSummary, setGradeSummary] = useState<GradeSummaryItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
     const [selectedAcademicYear, setSelectedAcademicYear] = useState<number>(getCurrentAcademicYear);
     const [availableYears, setAvailableYears] = useState<number[]>([]);
 
@@ -117,8 +119,8 @@ export default function GradesPage() {
             }
         };
         fetchClasses();
-    // 修正: 依存配列に selectedClassId を追加 (ログ 123:8)
-    }, [apiBaseUrl, selectedClassId]);
+        // apiBaseUrlが変更されたときに再実行するように依存配列に追加
+    }, [apiBaseUrl]); // 依存配列に apiBaseUrl を追加
 
     useEffect(() => {
         // selectedClassId または selectedAcademicYear が未選択なら何もしない
@@ -140,6 +142,7 @@ export default function GradesPage() {
 
                 const data: LessonCalendarItem[] = await res.json();
                 const filteredData = data.filter((item): item is LessonCalendarItem & { lesson_id: number } => item.lesson_id != null);
+
                 setLessons(filteredData.map((item) => ({
                     lesson_id: item.lesson_id,
                     lesson_name: item.lesson_name || "物理",
@@ -158,8 +161,7 @@ export default function GradesPage() {
             }
         };
         fetchLessons();
-    // 修正: 依存配列から apiBaseUrl を削除 (ログ 164:8)
-    }, [selectedClassId, selectedAcademicYear]);
+    }, [selectedClassId, selectedAcademicYear, apiBaseUrl]); // 依存配列に apiBaseUrl を追加
 
     useEffect(() => {
         // selectedLessonId が未選択なら何もしない
@@ -175,7 +177,6 @@ export default function GradesPage() {
             try {
                 const currentClass = classes.find(c => c.class_id === parseInt(selectedClassId));
                 const academic_year = selectedAcademicYear;
-                
                 // currentClassが存在しない場合やgradeが取得できない場合のデフォルト値を設定
                 const grade = currentClass?.grade ?? 1; // デフォルトを1に設定
 
@@ -189,7 +190,7 @@ export default function GradesPage() {
                     const errorText = await rawRes.text();
                     console.error("Failed to fetch raw data:", rawRes.status, errorText);
                     throw new Error(`回答データの取得に失敗しました (Status: ${rawRes.status})`);
-                }
+                 }
                 setRawData(await rawRes.json());
 
                 // コメントとサマリーは失敗してもエラーにしない（データがない場合もあるため）
@@ -206,7 +207,7 @@ export default function GradesPage() {
                     setGradeSummary(summaryData.summary || []);
                 } else {
                     console.warn("Failed to fetch grade summary:", gradeSummaryRes.status);
-                    // 学年データがない場合は空にする
+                     // 学年データがない場合は空にする
                     setGradeSummary([]);
                 }
 
@@ -222,9 +223,10 @@ export default function GradesPage() {
             }
         };
         fetchGradesData();
-    // 修正: 依存配列から apiBaseUrl を削除 (ログ 227:8)
-    }, [selectedLessonId, classes, selectedClassId, selectedAcademicYear]);
+    // classes, selectedClassId, selectedAcademicYear も依存配列に追加
+    }, [selectedLessonId, apiBaseUrl, classes, selectedClassId, selectedAcademicYear]);
 
+    // useMemo フックは変更なし
     const statistics = useMemo(() => {
         if (rawData.length === 0) return null;
 
@@ -255,8 +257,7 @@ export default function GradesPage() {
                 if (questionStats[label].choiceDistribution.hasOwnProperty(item.answer.selected_choice)) {
                     questionStats[label].choiceDistribution[item.answer.selected_choice]++;
                 }
-                const answerTime = item.answer.end_unix && item.answer.start_unix ?
-                    item.answer.end_unix - item.answer.start_unix : 0;
+                const answerTime = item.answer.end_unix && item.answer.start_unix ? item.answer.end_unix - item.answer.start_unix : 0;
                 // is_correctがnullでないことを確認
                 if (item.answer.is_correct === true) {
                     totalCorrect++;
@@ -314,9 +315,9 @@ export default function GradesPage() {
         }
 
         return { classAverage, questionStats, bestQuestion, worstQuestion, gradeAverage };
-    // 修正: 依存配列から selectedLessonId を削除 (ログ 318:8)
-    }, [rawData, gradeSummary]);
+    }, [rawData, gradeSummary, selectedLessonId]); // selectedLessonIdを追加して授業が変わった時に再計算
 
+    // keywordAnalysis フックは変更なし
     const keywordAnalysis = useMemo(() => {
         const keywords: { [key: string]: number } = {};
         comments.forEach(c => {
@@ -335,13 +336,13 @@ export default function GradesPage() {
                      .slice(0, 5);
     }, [comments]);
 
+
     const selectedLesson = lessons.find(l => l.lesson_id === parseInt(selectedLessonId));
     const selectedClass = classes.find(c => c.class_id === parseInt(selectedClassId));
-
     const formatDate = (dateStr: string) => {
         try {
             const date = new Date(dateStr);
-            // dateがInvalid Dateでないかチェック
+             // dateがInvalid Dateでないかチェック
             if (isNaN(date.getTime())) {
                 return "無効な日付";
             }
@@ -353,6 +354,7 @@ export default function GradesPage() {
         }
     };
 
+    // JSX部分は変更なし
     return (
         <div className="p-4 sm:p-6 md:p-8 bg-[#f4f7f9] min-h-screen">
              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -372,7 +374,7 @@ export default function GradesPage() {
                          onChange={(e) => {
                              setSelectedClassId(e.target.value);
                              setSelectedLessonId(""); // クラス変更時に授業選択をリセット
-                             setRawData([]); // データもリセット
+                             setRawData([]);       // データもリセット
                              setComments([]);
                              setGradeSummary([]);
                              setError(null);      // エラーもリセット
@@ -397,21 +399,22 @@ export default function GradesPage() {
                  </div>
              </div>
 
+            {/* loadingとerrorの表示は変更なし */}
             {loading && <div className="text-center py-10 text-gray-500">分析データを読み込み中...</div>}
             {!loading && error && <div className="text-center py-10 text-red-600 bg-red-50 p-4 rounded-lg">{error}</div>}
-            {/* データがない場合の表示を追加 */}
+             {/* データがない場合の表示を追加 */}
             {!loading && !error && !selectedLessonId && (
                 <div className="text-center py-10 text-gray-500">クラスと授業を選択してください。</div>
             )}
             {!loading && !error && selectedLessonId && !statistics && (
-                <div className="text-center py-10 text-gray-500">選択された授業の分析データが見つかりませんでした。</div>
+                 <div className="text-center py-10 text-gray-500">選択された授業の分析データが見つかりませんでした。</div>
             )}
 
 
             {!loading && !error && statistics && (
                 <main className="space-y-8">
                     <div className="bg-white p-4 rounded-xl shadow-sm">
-                         <h1 className="text-2xl font-bold text-gray-800">
+                        <h1 className="text-2xl font-bold text-gray-800">
                              {/* selectedClassとselectedLessonが存在するか確認 */}
                             {selectedAcademicYear}年度 {selectedClass?.class_name || 'クラス情報なし'} {selectedLesson?.lesson_name || '授業情報なし'} 学習結果分析
                         </h1>
@@ -438,16 +441,16 @@ export default function GradesPage() {
                     <section className="bg-white p-6 rounded-xl shadow-sm">
                         <h2 className="text-xl font-bold text-gray-800 pb-2 mb-6 border-b-2 border-gray-200">設問別 詳細分析</h2>
                          {/* 問題が存在しない場合の表示 */}
-                         {Object.keys(statistics.questionStats).length === 0 ? (
+                        {Object.keys(statistics.questionStats).length === 0 ? (
                             <p className="text-gray-500 text-center">この授業には分析対象の問題データがありません。</p>
                         ) : (
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-8">
-                                 {Object.entries(statistics.questionStats).map(([label, stats]) => {
+                                {Object.entries(statistics.questionStats).map(([label, stats]) => {
                                     // gradeSummaryが存在し、該当するquestion_idのデータを探す
                                     const gradeAvgItem = gradeSummary?.find(item => item.question_id === stats.question_id);
                                      // gradeAvgItemが存在する場合のみcorrect_rateを渡す
                                     const gradeAvgRate = gradeAvgItem?.correct_rate;
-                                     return <QuestionDetailCard key={label} label={label} stats={stats} gradeAvg={gradeAvgRate} />;
+                                    return <QuestionDetailCard key={label} label={label} stats={stats} gradeAvg={gradeAvgRate} />;
                                 })}
                             </div>
                         )}
@@ -467,6 +470,7 @@ export default function GradesPage() {
 }
 
 
+// SummaryCard コンポーネントは変更なし
 const SummaryCard = ({ title, value, color, description, isProblemCard }: { title: string, value: string, color: string, description: string, isProblemCard?: boolean }) => {
     const colors = {
         blue: { bg: 'bg-blue-50', text: 'text-blue-700', value: 'text-blue-800' },
@@ -475,7 +479,8 @@ const SummaryCard = ({ title, value, color, description, isProblemCard }: { titl
         amber: { bg: 'bg-amber-50', text: 'text-amber-700', value: 'text-amber-800' }
     };
     const c = colors[color as keyof typeof colors] || colors.gray;
-    // isProblemCardがtrueで、valueが長い場合にフォントサイズを調整
+
+     // isProblemCardがtrueで、valueが長い場合にフォントサイズを調整
     const valueStyle = isProblemCard && value.length > 20 ? 'text-sm' : 'text-lg';
 
     return (
@@ -490,6 +495,7 @@ const SummaryCard = ({ title, value, color, description, isProblemCard }: { titl
     );
 };
 
+// QuestionDetailCard コンポーネントは変更なし
 const QuestionDetailCard = ({ label, stats, gradeAvg }: { label: string, stats: QuestionStats, gradeAvg?: number | null }) => { // gradeAvgをnull許容に
     const correctRate = stats.total > 0 ? (stats.correct / stats.total) * 100 : 0;
     const rateColor = correctRate >= 80 ? 'green' : correctRate >= 50 ? 'orange' : 'red';
@@ -498,12 +504,13 @@ const QuestionDetailCard = ({ label, stats, gradeAvg }: { label: string, stats: 
         orange: 'font-semibold text-orange-600 bg-orange-100 px-2 py-0.5 rounded',
         red: 'font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded',
     };
-
+    // fullQuestionLabel の生成ロジックは変更なし
      const fullQuestionLabel = [stats.part_name, stats.chapter_name, stats.unit_name, stats.lesson_theme_name]
         .filter(Boolean) // null や空文字列を除外
         .map(s => s?.trim()) // 各部分の前後の空白を削除
         .filter(s => s && s.length > 0) // 空白のみの文字列も除外
         .join(" - ");
+
 
     return (
         <div className="border border-gray-200 rounded-lg p-4 space-y-4 flex flex-col bg-white shadow-sm">
@@ -514,11 +521,11 @@ const QuestionDetailCard = ({ label, stats, gradeAvg }: { label: string, stats: 
                     <div className="flex items-baseline gap-2 text-xs flex-shrink-0">
                         <span className={rateClasses[rateColor]}>クラス: {Math.round(correctRate)}%</span>
                         {/* gradeAvgがnullまたはundefinedでない場合のみ表示 */}
-                         <span className="font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                        <span className="font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
                            学年: {gradeAvg != null ? `${Math.round(gradeAvg)}%` : "データなし"}
                         </span>
                     </div>
-                 </div>
+                </div>
             </div>
             <div>
                 <p className="font-semibold text-xs text-gray-600 mb-2">回答選択率</p>
@@ -530,15 +537,14 @@ const QuestionDetailCard = ({ label, stats, gradeAvg }: { label: string, stats: 
                         return (
                             <div key={choice} className="flex items-center gap-2">
                                 <span className={`w-6 text-center ${isCorrect ? 'font-bold text-green-600' : 'text-gray-700'}`}>{choice}</span>
-                                 <div className={`flex-grow ${isCorrect ? 'bg-green-100' : 'bg-gray-100'} rounded-full h-3 relative overflow-hidden`}>
+                                <div className={`flex-grow ${isCorrect ? 'bg-green-100' : 'bg-gray-100'} rounded-full h-3 relative overflow-hidden`}>
                                      {/* バー */}
-                                    <div 
-                                        className={`${isCorrect ? 'bg-green-400' : 'bg-gray-400'} h-full rounded-full absolute top-0 left-0`} style={{ width: `${percentage}%` }}></div>
+                                    <div className={`${isCorrect ? 'bg-green-400' : 'bg-gray-400'} h-full rounded-full absolute top-0 left-0`} style={{ width: `${percentage}%` }}></div>
                                     {/* バーの上にテキスト表示 */}
                                     <span className={`absolute top-0 left-1/2 transform -translate-x-1/2 text-[10px] leading-3 ${percentage > 50 ? 'text-white' : 'text-gray-700'}`}>
                                         {Math.round(percentage)}%
                                     </span>
-                                 </div>
+                                </div>
                                 <span className={`w-10 text-right ${isCorrect ? 'text-green-600 font-bold' : 'text-transparent'}`}>{isCorrect ? '(正解)' : ''}</span>
                             </div>
                         );
@@ -551,6 +557,7 @@ const QuestionDetailCard = ({ label, stats, gradeAvg }: { label: string, stats: 
 };
 
 
+// AnswerTimeDistribution, DotPlot, KeywordMap, CommentsList コンポーネントは変更なし
 const AnswerTimeDistribution = ({ stats }: { stats: QuestionStats }) => {
     // ゼロ除算を避ける
     const avgCorrect = stats.correctTimes.length > 0 ? Math.round(stats.correctTimes.reduce((a, b) => a + b, 0) / stats.correctTimes.length) : null;
@@ -559,6 +566,7 @@ const AnswerTimeDistribution = ({ stats }: { stats: QuestionStats }) => {
     // 平均時間が計算できた場合のみタイトルに追加
     const correctTitle = `正解者` + (avgCorrect !== null ? ` (平均: ${avgCorrect}秒)` : '');
     const incorrectTitle = `不正解者` + (avgIncorrect !== null ? ` (平均: ${avgIncorrect}秒)` : '');
+
 
     return (
         <div className="flex-grow flex flex-col mt-2"> {/* 上部のマージンを少し追加 */}
@@ -569,31 +577,30 @@ const AnswerTimeDistribution = ({ stats }: { stats: QuestionStats }) => {
                     {(avgCorrect !== null || avgIncorrect !== null) && ( // 平均がある場合のみ表示
                         <div className="flex items-center gap-1">
                              {/* 星アイコン */}
-                             <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/></svg>
+                            <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/></svg>
                             <span>平均</span>
                         </div>
                     )}
                      {/* 凡例 */}
                     <div className="flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-400"></span>
-                         <span>正解</span>
+                        <span>正解</span>
                     </div>
                      <div className="flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
-                         <span>不正解</span>
+                        <span>不正解</span>
                     </div>
                 </div>
             </div>
             <div className="space-y-3 text-xs flex-grow"> {/* space-yを調整 */}
                  {/* 正解者のドットプロット */}
-                 <DotPlot title={correctTitle} times={stats.correctTimes} color="green" avgTime={avgCorrect} />
+                <DotPlot title={correctTitle} times={stats.correctTimes} color="green" avgTime={avgCorrect} />
                  {/* 不正解者のドットプロット */}
                 <DotPlot title={incorrectTitle} times={stats.incorrectTimes} color="gray" avgTime={avgIncorrect} />
             </div>
         </div>
     );
 };
-
 const DotPlot = ({ title, times, color, avgTime }: { title: string, times: number[], color: 'green' | 'gray', avgTime: number | null }) => { // avgTimeをnull許容に
     const maxTime = 600; // X軸の最大値（秒）
     const timeCounts: { [time: number]: number } = {};
@@ -609,7 +616,7 @@ const DotPlot = ({ title, times, color, avgTime }: { title: string, times: numbe
             <div className="relative h-14 mt-1"> {/* dot-plot-container */}
                 {/* ドット表示エリア */}
                 <div className="absolute bottom-4 left-0 right-0 h-8"> {/* dot-container */}
-                     {Object.entries(timeCounts).map(([timeStr, count]) => {
+                    {Object.entries(timeCounts).map(([timeStr, count]) => {
                         const time = Number(timeStr);
                          // 最大値を超えないように位置を計算
                         const position = Math.min(100, Math.max(0, (time / maxTime) * 100));
@@ -618,7 +625,7 @@ const DotPlot = ({ title, times, color, avgTime }: { title: string, times: numbe
                                 key={`${time}-${i}`}
                                 className={`absolute bottom-0 w-1.5 h-1.5 rounded-full transform -translate-x-1/2 ${color === 'green' ? 'bg-green-400' : 'bg-gray-400'} dot dot-stack-${i + 1}`}
                                 style={{ left: `${position}%`, bottom: `${i * 7}px` }} // 積み重ねの間隔を調整
-                                 title={`${time}秒 (${count}人)`} // ツールチップに人数も表示
+                                title={`${time}秒 (${count}人)`} // ツールチップに人数も表示
                             ></span>
                         ));
                     })}
@@ -626,25 +633,24 @@ const DotPlot = ({ title, times, color, avgTime }: { title: string, times: numbe
                 {/* X軸エリア */}
                 <div className="absolute bottom-0 left-0 right-0 h-4"> {/* axis-container */}
                      {/* X軸線 */}
-                     <div className="absolute bottom-2 left-0 right-0 h-px bg-gray-300"></div> {/* axis-line */}
+                    <div className="absolute bottom-2 left-0 right-0 h-px bg-gray-300"></div> {/* axis-line */}
                      {/* X軸ラベル */}
                     <span className="absolute bottom-[-4px] text-[9px] text-gray-500 transform -translate-x-1/2" style={{ left: '0%' }}>0s</span> {/* axis-label */}
                     <span className="absolute bottom-[-4px] text-[9px] text-gray-500 transform -translate-x-1/2" style={{ left: '50%' }}>300s</span> {/* axis-label */}
-                     <span className="absolute bottom-[-4px] text-[9px] text-gray-500 transform -translate-x-1/2" style={{ left: '100%' }}>600s</span> {/* axis-label */}
+                    <span className="absolute bottom-[-4px] text-[9px] text-gray-500 transform -translate-x-1/2" style={{ left: '100%' }}>600s</span> {/* axis-label */}
                     {/* 平均マーカー */}
                      {avgTime !== null && times.length > 0 && ( // avgTimeがnullでない場合のみ表示
-                         <div className="absolute bottom-2 w-3 h-3 transform -translate-x-1/2 translate-y-1/2" style={{ left: `${Math.min(100, Math.max(0, (avgTime / maxTime) * 100))}%` }} title={`平均: ${avgTime}秒`}> {/* avg-marker */}
+                        <div className="absolute bottom-2 w-3 h-3 transform -translate-x-1/2 translate-y-1/2" style={{ left: `${Math.min(100, Math.max(0, (avgTime / maxTime) * 100))}%` }} title={`平均: ${avgTime}秒`}> {/* avg-marker */}
                             <svg className={`w-full h-full ${color === 'green' ? 'text-green-600' : 'text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20">
                                 <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
                             </svg>
-                         </div>
+                        </div>
                     )}
                 </div>
             </div>
         </div>
     );
 };
-
 const KeywordMap = ({ keywords }: { keywords: [string, number][] }) => {
     // keywordsが空、または有効なキーワードがない場合は早期リターン
     if (!keywords || keywords.length === 0 || keywords.every(([word, count]) => count <= 0)) {
@@ -661,8 +667,7 @@ const KeywordMap = ({ keywords }: { keywords: [string, number][] }) => {
     // 最大カウントが0にならないように調整
     const maxCount = Math.max(1, ...keywords.map(k => k[1]));
     // 最小カウントも考慮してスケールを調整（対数スケールが適切か線形スケールが良いか検討）
-    // const minCount = Math.max(1, Math.min(...keywords.map(k => k[1])));
-    // あまり使わないかも
+    // const minCount = Math.max(1, Math.min(...keywords.map(k => k[1]))); // あまり使わないかも
 
     const getStyle = (count: number) => {
         const baseSize = 0.7; // rem 単位
@@ -686,7 +691,6 @@ const KeywordMap = ({ keywords }: { keywords: [string, number][] }) => {
             display: 'inline-block', // マージンを有効にする
             };
     };
-
     return (
         <div>
             <h3 className="font-semibold text-gray-700 mb-3 text-center text-sm">キーワードマップ</h3>
@@ -712,7 +716,7 @@ const CommentsList = ({ comments }: { comments: CommentData[] }) => {
             <div className="space-y-2">
                 {validComments.length > 0 ? (
                     validComments.slice(0, 3).map((c, i) => (
-                         <div key={c.student_id + '-' + i} className="bg-gray-100 p-3 rounded-lg text-xs text-gray-800 shadow-sm">
+                        <div key={c.student_id + '-' + i} className="bg-gray-100 p-3 rounded-lg text-xs text-gray-800 shadow-sm">
                              {/* 誰のコメントか分かるように名前も表示（オプション）*/}
                             {/* <span className="font-semibold mr-2">{c.student_name}:</span> */}
                             「{c.comment_text}」
