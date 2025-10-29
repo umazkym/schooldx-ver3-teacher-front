@@ -19,7 +19,7 @@ interface AnswerDataWithDetails {
   answer_start_unix: number | null;
   answer_end_unix: number | null;
   question: {
-    question_id: number; // ネストされたオブジェクト内に定義
+    lesson_question_id: number; // <-- キー名を修正
     question_label: string;
   };
 }
@@ -389,7 +389,7 @@ function DashboardPageContent() {
         allStudentsData.forEach(result => {
             if (result.data) {
                 result.data.forEach(answer => {
-                    questionIds.add(answer.question.question_id);
+                    questionIds.add(answer.question.lesson_question_id);
                 });
             }
         });
@@ -427,7 +427,7 @@ function DashboardPageContent() {
         result.data.forEach(answer => {
           // ★★★ 修正箇所 ★★★
           // ハードコードされたマップの代わりに、動的に生成したマップ(currentMap)を参照する
-          const keys = currentMap ? currentMap[answer.question.question_id] : undefined;
+          const keys = currentMap ? currentMap[answer.question.lesson_question_id] : undefined;
           
           if (keys) {
               const statusKey = keys.status;
