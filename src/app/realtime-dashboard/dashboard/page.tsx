@@ -4,7 +4,7 @@
 export const dynamic = "force-dynamic";
 import React, { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Socket } from "socket-io-client";
+import type { Socket } from "socket.io-client";
 import { getSocket } from "@/lib/socket";
 import { apiBaseUrl } from '@/lib/apiConfig';
 
