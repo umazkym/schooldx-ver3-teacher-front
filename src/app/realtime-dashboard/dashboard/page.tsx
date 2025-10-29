@@ -79,53 +79,6 @@ function DashboardPageContent() {
 
   const socketRef = useRef<Socket | null>(null);
 
-  // ★ Socket.IOイベントの購読ロジックを修正
-  useEffect(() => {
-    const socket = getSocket();
-    socketRef.current = socket;
-
-    if (!socket.connected) {
-      socket.connect();
-    }
-
-    const handleSocketMessage = (data: string) => {
-      console.log("🌐 Web recv from Flutter:", data);
-      
-      // バックエンドから 'student_answered,lessonId,studentId,answerDataId' 形式で飛んでくる
-      const parts = data.split(',');
-      const eventType = parts[0];
-
-      // ★ イベントタイプをチェック
-      if (eventType === 'student_answered') {
-        const receivedLessonId = parseInt(parts[1], 10);
-        
-        // 現在開いているダッシュボードの授業IDと一致する場合のみデータを再取得
-        if (receivedLessonId === lessonId) {
-          console.log(`Matching answer update received for lesson ${lessonId}. Refetching data.`);
-          // ★ ポーリングを待たずに即時データ取得を実行
-          fetchAllStudentsData();
-        } else {
-          console.log(`Ignoring answer update for different lesson: ${receivedLessonId}`);
-        }
-      }
-      
-      // 他のイベントタイプ（例：'student_question'など）もここで処理できる
-    };
-
-    socket.on("connect", () =>
-      console.log("🌐 Web connected (Dashboard)")
-    );
-    
-    socket.on("from_flutter", handleSocketMessage);
-
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.off("connect");
-        socketRef.current.off("from_flutter", handleSocketMessage);
-      }
-    };
-  }, [fetchAllStudentsData, lessonId]); // ★ fetchAllStudentsData, lessonId を依存配列に追加
-
 
   const searchParams = useSearchParams();
   const lessonIdStr = searchParams.get("lesson_id");
@@ -496,6 +449,52 @@ function DashboardPageContent() {
     );
   }, [lessonId, calcIcon, calcProgress, apiBaseUrl]); // apiBaseUrl を依存配列に追加
 
+  // Socket.IOイベントの購読ロジック
+  useEffect(() => {
+    const socket = getSocket();
+    socketRef.current = socket;
+
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    const handleSocketMessage = (data: string) => {
+      console.log("🌐 Web recv from Flutter:", data);
+
+      // バックエンドから 'student_answered,lessonId,studentId,answerDataId' 形式で飛んでくる
+      const parts = data.split(',');
+      const eventType = parts[0];
+
+      // イベントタイプをチェック
+      if (eventType === 'student_answered') {
+        const receivedLessonId = parseInt(parts[1], 10);
+
+        // 現在開いているダッシュボードの授業IDと一致する場合のみデータを再取得
+        if (receivedLessonId === lessonId) {
+          console.log(`Matching answer update received for lesson ${lessonId}. Refetching data.`);
+          // ポーリングを待たずに即時データ取得を実行
+          fetchAllStudentsData();
+        } else {
+          console.log(`Ignoring answer update for different lesson: ${receivedLessonId}`);
+        }
+      }
+
+      // 他のイベントタイプ（例：'student_question'など）もここで処理できる
+    };
+
+    socket.on("connect", () =>
+      console.log("🌐 Web connected (Dashboard)")
+    );
+
+    socket.on("from_flutter", handleSocketMessage);
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.off("connect");
+        socketRef.current.off("from_flutter", handleSocketMessage);
+      }
+    };
+  }, [fetchAllStudentsData, lessonId]);
 
   // 修正6: タイマー起動時の初回データ取得とポーリング設定
   useEffect(() => {
