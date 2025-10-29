@@ -488,10 +488,8 @@ function DashboardPageContent() {
               const newProgress = calcProgress(answer);
               const currentProgress = student[progressKey];
 
-              // 解答中でない場合、または解答中で進捗が進んでいる場合のみ更新
-              if (answer.answer_status !== 1 || newProgress >= currentProgress) {
-                studentUpdate[progressKey] = newProgress;
-              }
+              // プログレスバーを常に更新（pencil状態でも確実に更新されるように）
+              studentUpdate[progressKey] = newProgress;
 
               // answer_start_unixを保存（リアルタイム進捗バー更新に使用）
               // getStartUnixを使ってanswer_start_unixまたはanswer_start_timestampから取得
@@ -569,9 +567,9 @@ function DashboardPageContent() {
     // 演習開始（isRunning=true）時にまず1回実行
     fetchAllStudentsData();
 
-    // その後、1秒ごとのポーリングを開始（リアルタイム更新のため）
-    // 回答中の進捗をリアルタイムで反映するために、APIから最新データを頻繁に取得
-    const intervalId = setInterval(fetchAllStudentsData, 1000);
+    // その後、5秒ごとのポーリングを開始（リアルタイム更新のため）
+    // 回答中の進捗をリアルタイムで反映するために、APIから最新データを定期的に取得
+    const intervalId = setInterval(fetchAllStudentsData, 5000);
 
     // クリーンアップ関数
     return () => clearInterval(intervalId);
@@ -624,7 +622,7 @@ function DashboardPageContent() {
           return hasUpdate ? { ...student, ...studentUpdate } : student;
         })
       );
-    }, 1000); // 1秒ごとに実行
+    }, 5000); // 5秒ごとに実行
 
     return () => clearInterval(timer);
   }, [isRunning, defaultMinutes]);
