@@ -347,9 +347,29 @@ function DashboardPageContent() {
     // answer_start_timestampが設定されていればそれを変換して使用
     if (d.answer_start_timestamp) {
       try {
-        const date = new Date(d.answer_start_timestamp);
-        return Math.floor(date.getTime() / 1000);
-      } catch {
+        // Flutter側から "2025-11-01 23:44:23.820" のような形式で来る場合に対応
+        // ISO 8601形式に変換 (スペースをTに置換、Zを追加してUTCとして扱う)
+        let isoString = d.answer_start_timestamp.trim();
+
+        // スペース区切りの場合、ISO形式に変換
+        if (isoString.includes(' ')) {
+          isoString = isoString.replace(' ', 'T');
+        }
+
+        // タイムゾーン情報がない場合、ローカルタイムとして扱う
+        const date = new Date(isoString);
+
+        // 日付が無効でないかチェック
+        if (isNaN(date.getTime())) {
+          console.error('Invalid timestamp format:', d.answer_start_timestamp);
+          return null;
+        }
+
+        const unixTimestamp = Math.floor(date.getTime() / 1000);
+        console.log(`Converted timestamp: ${d.answer_start_timestamp} -> ${unixTimestamp}`);
+        return unixTimestamp;
+      } catch (error) {
+        console.error('Error parsing timestamp:', d.answer_start_timestamp, error);
         return null;
       }
     }
@@ -491,14 +511,24 @@ function DashboardPageContent() {
               // プログレスバーを常に更新（pencil状態でも確実に更新されるように）
               studentUpdate[progressKey] = newProgress;
 
+              // statusの更新: 一度「正解」または「不正解」になった問題は、statusを変更しない
+              const currentStatus = student[statusKey];
+              const newStatus = calcIcon(answer);
+
               // answer_start_unixを保存（リアルタイム進捗バー更新に使用）
               // getStartUnixを使ってanswer_start_unixまたはanswer_start_timestampから取得
               const startUnixValue = getStartUnix(answer);
               (studentUpdate as Record<string, number | null>)[startUnixKey] = startUnixValue;
 
-              // statusの更新: 一度「正解」または「不正解」になった問題は、statusを変更しない
-              const currentStatus = student[statusKey];
-              const newStatus = calcIcon(answer);
+              // デバッグ: startUnixの保存状況を確認
+              if (startUnixValue) {
+                console.log(`Student ${student.id} - ${statusKey}: startUnix set to ${startUnixValue}, status: ${newStatus}`);
+              } else {
+                console.warn(`Student ${student.id} - ${statusKey}: startUnix is null!`, {
+                  answer_start_unix: answer.answer_start_unix,
+                  answer_start_timestamp: answer.answer_start_timestamp
+                });
+              }
 
               // 現在のstatusが「correct」または「wrong」の場合は、新しいstatusに上書きしない
               if (currentStatus !== 'correct' && currentStatus !== 'wrong') {
@@ -580,8 +610,11 @@ function DashboardPageContent() {
   useEffect(() => {
     if (!isRunning) return;
 
+    console.log('🔄 Real-time progress update timer started');
+
     const timer = setInterval(() => {
       const currentMap = dynamicQuestionMapRef.current;
+      console.log('⏱️ Updating progress (5s tick). Map exists:', !!currentMap);
       // currentMapがnullの場合でも、固定キー（q1, q2, q3, q4）で進捗を更新
 
       setStudents(prevStudents =>
@@ -607,11 +640,15 @@ function DashboardPageContent() {
                   const diff = nowUnix - startUnix;
                   const newProgress = Math.min(100, (diff / (defaultMinutes * 60)) * 100);
 
+                  console.log(`📊 Student ${student.id} - ${statusKey}: progress ${student[progressKey]}% -> ${newProgress.toFixed(1)}% (diff: ${diff}s)`);
+
                   // 進捗が変わった場合のみ更新
                   if (newProgress !== student[progressKey]) {
                     studentUpdate[progressKey] = newProgress;
                     hasUpdate = true;
                   }
+                } else {
+                  console.warn(`⚠️ Student ${student.id} - ${statusKey}: pencil status but no startUnix (${student[startUnixKey]})`);
                 }
               }
             });
@@ -641,11 +678,15 @@ function DashboardPageContent() {
                   const diff = nowUnix - startUnix;
                   const newProgress = Math.min(100, (diff / (defaultMinutes * 60)) * 100);
 
+                  console.log(`📊 [Fixed] Student ${student.id} - ${statusKey}: progress ${student[progressKey]}% -> ${newProgress.toFixed(1)}% (diff: ${diff}s)`);
+
                   // 進捗が変わった場合のみ更新
                   if (newProgress !== student[progressKey]) {
                     studentUpdate[progressKey] = newProgress;
                     hasUpdate = true;
                   }
+                } else {
+                  console.warn(`⚠️ [Fixed] Student ${student.id} - ${statusKey}: pencil status but no startUnix (${student[startUnixKey]})`);
                 }
               }
             });
