@@ -341,6 +341,17 @@ function DashboardPageContent() {
 
     // answer_start_unixが設定されていればそれを使用
     if (d.answer_start_unix != null && d.answer_start_unix > 0) {
+      const nowUnix = Math.floor(Date.now() / 1000);
+      const diff = nowUnix - d.answer_start_unix;
+      console.log(`📅 Using answer_start_unix: ${d.answer_start_unix}, current: ${nowUnix}, diff: ${diff}s (${(diff/60).toFixed(1)}min)`);
+
+      // 未来のタイムスタンプや異常な値の警告
+      if (diff < -60) {
+        console.warn(`⚠️ WARNING: Timestamp is in the future by ${Math.abs(diff)}s!`);
+      } else if (diff > 86400) {
+        console.warn(`⚠️ WARNING: Timestamp is more than 24 hours old!`);
+      }
+
       return d.answer_start_unix;
     }
 
@@ -366,7 +377,10 @@ function DashboardPageContent() {
         }
 
         const unixTimestamp = Math.floor(date.getTime() / 1000);
-        console.log(`Converted timestamp: ${d.answer_start_timestamp} -> ${unixTimestamp}`);
+        const nowUnix = Math.floor(Date.now() / 1000);
+        const diff = nowUnix - unixTimestamp;
+        console.log(`Converted timestamp: ${d.answer_start_timestamp} -> ${unixTimestamp}, diff: ${diff}s`);
+
         return unixTimestamp;
       } catch (error) {
         console.error('Error parsing timestamp:', d.answer_start_timestamp, error);
@@ -434,6 +448,18 @@ function DashboardPageContent() {
             return { studentId, error: `Status ${res.status}` };
           }
           const data: AnswerDataWithDetails[] = await res.json();
+
+          // デバッグ: APIから取得した生データを確認
+          if (data.length > 0) {
+            console.log('🔍 Raw API response for student', studentId, ':', data.map(item => ({
+              question_id: item.question.lesson_question_id,
+              answer_status: item.answer_status,
+              answer_start_unix: item.answer_start_unix,
+              answer_start_timestamp: item.answer_start_timestamp,
+              answer_end_unix: item.answer_end_unix
+            })));
+          }
+
           return { studentId, data };
         } catch (error) {
           console.error(`Error fetching data for student ${studentId}:`, error);
@@ -610,11 +636,21 @@ function DashboardPageContent() {
   useEffect(() => {
     if (!isRunning) return;
 
+    const nowMs = Date.now();
+    const nowUnix = Math.floor(nowMs / 1000);
+    const nowDate = new Date(nowMs);
     console.log('🔄 Real-time progress update timer started');
+    console.log('🕐 Browser current time:', {
+      unix: nowUnix,
+      iso: nowDate.toISOString(),
+      local: nowDate.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+    });
 
     const timer = setInterval(() => {
       const currentMap = dynamicQuestionMapRef.current;
-      console.log('⏱️ Updating progress (5s tick). Map exists:', !!currentMap);
+      const tickNow = Math.floor(Date.now() / 1000);
+      console.log(`⏱️ Updating progress (5s tick). Map exists: ${!!currentMap}, current unix: ${tickNow}`);
       // currentMapがnullの場合でも、固定キー（q1, q2, q3, q4）で進捗を更新
 
       setStudents(prevStudents =>
