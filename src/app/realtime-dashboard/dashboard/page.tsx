@@ -138,6 +138,15 @@ function DashboardPageContent() {
   } | null>(null);
   const dynamicQuestionMapRef = useRef(dynamicQuestionMap);
 
+  // サーバー時刻とクライアント時刻のオフセットを保存（ミリ秒単位）
+  const [timeOffset, setTimeOffset] = useState<number>(0);
+  const timeOffsetRef = useRef(timeOffset);
+
+  // サーバー時刻を取得する関数（クライアント時刻のズレを考慮）
+  const getServerUnixTime = useCallback(() => {
+    return Math.floor((Date.now() + timeOffsetRef.current) / 1000);
+  }, []);
+
   // 修正3: State が変更されたら Ref にも同期
   useEffect(() => {
     studentsRef.current = students;
@@ -145,6 +154,9 @@ function DashboardPageContent() {
   useEffect(() => {
     dynamicQuestionMapRef.current = dynamicQuestionMap;
   }, [dynamicQuestionMap]);
+  useEffect(() => {
+    timeOffsetRef.current = timeOffset;
+  }, [timeOffset]);
 
   // 修正4: 生徒リストの初期化処理 (初回ロード時に一度だけ実行)
   useEffect(() => {
@@ -341,11 +353,27 @@ function DashboardPageContent() {
 
     // answer_start_unixが設定されていればそれを使用
     if (d.answer_start_unix != null && d.answer_start_unix > 0) {
-      const nowUnix = Math.floor(Date.now() / 1000);
-      const diff = nowUnix - d.answer_start_unix;
-      console.log(`📅 Using answer_start_unix: ${d.answer_start_unix}, current: ${nowUnix}, diff: ${diff}s (${(diff/60).toFixed(1)}min)`);
+      const clientNowUnix = Math.floor(Date.now() / 1000);
+      const serverNowUnix = getServerUnixTime();
+      const diff = serverNowUnix - d.answer_start_unix;
 
-      // 未来のタイムスタンプや異常な値の警告
+      // 初回APIレスポンス時にサーバー時刻のオフセットを計算
+      if (timeOffsetRef.current === 0 && d.answer_status === 1) {
+        // answer_status === 1 は解答中なので、現在時刻とそれほど離れていないはず
+        // クライアント時刻がサーバー時刻より遅れている場合、オフセットを設定
+        const estimatedOffset = (d.answer_start_unix - clientNowUnix) * 1000; // ミリ秒に変換
+
+        // オフセットが±1時間以上の場合のみ設定（小さなズレは無視）
+        if (Math.abs(estimatedOffset) > 3600000) {
+          console.log(`🕐 Detected time offset: ${(estimatedOffset/1000/60).toFixed(1)} minutes. Adjusting client time.`);
+          setTimeOffset(estimatedOffset);
+          timeOffsetRef.current = estimatedOffset;
+        }
+      }
+
+      console.log(`📅 Using answer_start_unix: ${d.answer_start_unix}, client: ${clientNowUnix}, server: ${serverNowUnix}, diff: ${diff}s (${(diff/60).toFixed(1)}min)`);
+
+      // 未来のタイムスタンプや異常な値の警告（サーバー時刻基準）
       if (diff < -60) {
         console.warn(`⚠️ WARNING: Timestamp is in the future by ${Math.abs(diff)}s!`);
       } else if (diff > 86400) {
@@ -389,7 +417,7 @@ function DashboardPageContent() {
     }
 
     return null;
-  }, []);
+  }, [getServerUnixTime]);
 
   // calcIcon: 解答のステータスに応じたアイコンを返す
   // answer_start_unixまたはanswer_start_timestampが設定されているかチェック
@@ -416,14 +444,14 @@ function DashboardPageContent() {
     }
 
     if (d.answer_status === 1) {
-      const nowUnix = Math.floor(Date.now() / 1000);
+      const nowUnix = getServerUnixTime(); // サーバー時刻を使用
       const diff = nowUnix - startUnix;
 
       return Math.min(100, (diff / (defaultMinutes * 60)) * 100);
     }
 
     return 0;
-  }, [defaultMinutes, getStartUnix]);
+  }, [defaultMinutes, getStartUnix, getServerUnixTime]);
 
   // 修正5: fetchAllStudentsData を修正 (マッピングの動的生成を追加)
   const fetchAllStudentsData = useCallback(async () => {
@@ -672,7 +700,7 @@ function DashboardPageContent() {
               if (student[statusKey] === 'pencil') {
                 if (student[startUnixKey] != null && student[startUnixKey] > 0) {
                   const startUnix = student[startUnixKey] as number;
-                  const nowUnix = Math.floor(Date.now() / 1000);
+                  const nowUnix = getServerUnixTime(); // サーバー時刻を使用
                   const diff = nowUnix - startUnix;
                   const newProgress = Math.min(100, (diff / (defaultMinutes * 60)) * 100);
 
@@ -710,7 +738,7 @@ function DashboardPageContent() {
               if (student[statusKey] === 'pencil') {
                 if (student[startUnixKey] != null && student[startUnixKey] > 0) {
                   const startUnix = student[startUnixKey] as number;
-                  const nowUnix = Math.floor(Date.now() / 1000);
+                  const nowUnix = getServerUnixTime(); // サーバー時刻を使用
                   const diff = nowUnix - startUnix;
                   const newProgress = Math.min(100, (diff / (defaultMinutes * 60)) * 100);
 
@@ -735,7 +763,7 @@ function DashboardPageContent() {
     }, 5000); // 5秒ごとに実行
 
     return () => clearInterval(timer);
-  }, [isRunning, defaultMinutes]);
+  }, [isRunning, defaultMinutes, getServerUnixTime]);
 
 
   function CellWithBar({ icon, progress }: { icon: string; progress: number }) {
