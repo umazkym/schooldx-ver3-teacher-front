@@ -354,24 +354,26 @@ function DashboardPageContent() {
     // answer_start_unixが設定されていればそれを使用
     if (d.answer_start_unix != null && d.answer_start_unix > 0) {
       const clientNowUnix = Math.floor(Date.now() / 1000);
-      const serverNowUnix = getServerUnixTime();
-      const diff = serverNowUnix - d.answer_start_unix;
 
       // 初回APIレスポンス時にサーバー時刻のオフセットを計算
-      if (timeOffsetRef.current === 0 && d.answer_status === 1) {
-        // answer_status === 1 は解答中なので、現在時刻とそれほど離れていないはず
-        // クライアント時刻がサーバー時刻より遅れている場合、オフセットを設定
-        const estimatedOffset = (d.answer_start_unix - clientNowUnix) * 1000; // ミリ秒に変換
+      if (timeOffsetRef.current === 0) {
+        // タイムスタンプが現在時刻と大きくずれている場合、オフセットを設定
+        // answer_start_unixは最近の時刻のはずなので、1時間以上のズレがあれば異常
+        const rawDiff = clientNowUnix - d.answer_start_unix;
 
-        // オフセットが±1時間以上の場合のみ設定（小さなズレは無視）
-        if (Math.abs(estimatedOffset) > 3600000) {
-          console.log(`🕐 Detected time offset: ${(estimatedOffset/1000/60).toFixed(1)} minutes. Adjusting client time.`);
+        // マイナス（未来）の場合、またはプラスで大きすぎる場合
+        if (rawDiff < -3600 || (rawDiff < 0 && Math.abs(rawDiff) > 60)) {
+          const estimatedOffset = (d.answer_start_unix - clientNowUnix) * 1000; // ミリ秒に変換
+          console.log(`🕐 Detected time offset: ${(estimatedOffset/1000/60).toFixed(1)} minutes (${(estimatedOffset/1000).toFixed(0)}s). Adjusting client time.`);
           setTimeOffset(estimatedOffset);
           timeOffsetRef.current = estimatedOffset;
         }
       }
 
-      console.log(`📅 Using answer_start_unix: ${d.answer_start_unix}, client: ${clientNowUnix}, server: ${serverNowUnix}, diff: ${diff}s (${(diff/60).toFixed(1)}min)`);
+      const serverNowUnix = getServerUnixTime();
+      const diff = serverNowUnix - d.answer_start_unix;
+
+      console.log(`📅 Using answer_start_unix: ${d.answer_start_unix}, client: ${clientNowUnix}, server: ${serverNowUnix}, diff: ${diff}s (${(diff/60).toFixed(1)}min), offset: ${timeOffsetRef.current/1000}s`);
 
       // 未来のタイムスタンプや異常な値の警告（サーバー時刻基準）
       if (diff < -60) {
