@@ -582,41 +582,74 @@ function DashboardPageContent() {
 
     const timer = setInterval(() => {
       const currentMap = dynamicQuestionMapRef.current;
-      if (!currentMap) return;
+      // currentMapがnullの場合でも、固定キー（q1, q2, q3, q4）で進捗を更新
 
       setStudents(prevStudents =>
         prevStudents.map(student => {
           const studentUpdate: Partial<Student> = {};
           let hasUpdate = false;
 
-          // 動的マップのキー（問題ID）に基づいて処理
-          Object.keys(currentMap).forEach(questionIdStr => {
-            const qId = parseInt(questionIdStr, 10);
-            const keyInfo = currentMap[qId];
+          // 動的マップが存在する場合は、マップに基づいて処理
+          if (currentMap) {
+            Object.keys(currentMap).forEach(questionIdStr => {
+              const qId = parseInt(questionIdStr, 10);
+              const keyInfo = currentMap[qId];
 
-            const statusKey = keyInfo.status;
-            const progressKey = keyInfo.progress;
-            const startUnixKey = keyInfo.startUnix;
+              const statusKey = keyInfo.status;
+              const progressKey = keyInfo.progress;
+              const startUnixKey = keyInfo.startUnix;
 
-            // 解答中（status='pencil'）かつanswer_start_unixが設定されている場合のみ更新
-            if (student[statusKey] === 'pencil') {
-              if (student[startUnixKey] != null && student[startUnixKey] > 0) {
-                const startUnix = student[startUnixKey] as number;
-                const nowUnix = Math.floor(Date.now() / 1000);
-                const diff = nowUnix - startUnix;
-                const newProgress = Math.min(100, (diff / (defaultMinutes * 60)) * 100);
+              // 解答中（status='pencil'）かつanswer_start_unixが設定されている場合のみ更新
+              if (student[statusKey] === 'pencil') {
+                if (student[startUnixKey] != null && student[startUnixKey] > 0) {
+                  const startUnix = student[startUnixKey] as number;
+                  const nowUnix = Math.floor(Date.now() / 1000);
+                  const diff = nowUnix - startUnix;
+                  const newProgress = Math.min(100, (diff / (defaultMinutes * 60)) * 100);
 
-                // 進捗が変わった場合のみ更新
-                if (newProgress !== student[progressKey]) {
-                  studentUpdate[progressKey] = newProgress;
-                  hasUpdate = true;
+                  // 進捗が変わった場合のみ更新
+                  if (newProgress !== student[progressKey]) {
+                    studentUpdate[progressKey] = newProgress;
+                    hasUpdate = true;
+                  }
                 }
-              } else {
-                // デバッグ: startUnixが設定されていない場合
-                console.log(`Student ${student.id} has pencil status but startUnix is not set for ${statusKey}`);
               }
-            }
-          });
+            });
+          } else {
+            // マップがまだ生成されていない場合は、固定キーで更新
+            const fixedKeys: Array<{
+              status: StudentStringKey,
+              progress: StudentNumberKey,
+              startUnix: keyof Pick<Student, 'q1StartUnix' | 'q2StartUnix' | 'q3StartUnix' | 'q4StartUnix'>
+            }> = [
+              { status: 'q1', progress: 'q1Progress', startUnix: 'q1StartUnix' },
+              { status: 'q2', progress: 'q2Progress', startUnix: 'q2StartUnix' },
+              { status: 'q3', progress: 'q3Progress', startUnix: 'q3StartUnix' },
+              { status: 'q4', progress: 'q4Progress', startUnix: 'q4StartUnix' },
+            ];
+
+            fixedKeys.forEach(keyInfo => {
+              const statusKey = keyInfo.status;
+              const progressKey = keyInfo.progress;
+              const startUnixKey = keyInfo.startUnix;
+
+              // 解答中（status='pencil'）かつanswer_start_unixが設定されている場合のみ更新
+              if (student[statusKey] === 'pencil') {
+                if (student[startUnixKey] != null && student[startUnixKey] > 0) {
+                  const startUnix = student[startUnixKey] as number;
+                  const nowUnix = Math.floor(Date.now() / 1000);
+                  const diff = nowUnix - startUnix;
+                  const newProgress = Math.min(100, (diff / (defaultMinutes * 60)) * 100);
+
+                  // 進捗が変わった場合のみ更新
+                  if (newProgress !== student[progressKey]) {
+                    studentUpdate[progressKey] = newProgress;
+                    hasUpdate = true;
+                  }
+                }
+              }
+            });
+          }
 
           // 更新がある場合のみ新しいオブジェクトを返す
           return hasUpdate ? { ...student, ...studentUpdate } : student;
