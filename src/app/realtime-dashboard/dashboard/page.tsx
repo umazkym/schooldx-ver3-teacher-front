@@ -1,4 +1,5 @@
 // ファイル: src/app/realtime-dashboard/dashboard/page.tsx
+// 【修正済み・全文】
 
 "use client";
 export const dynamic = "force-dynamic";
@@ -59,6 +60,9 @@ interface LessonThemeBlock {
 }
 
 interface LessonInformation {
+  // ▼▼▼ 【修正】 class_id を追加 ▼▼▼
+  class_id: number;
+  // ▲▲▲ 【修正】 ▲▲▲
   date: string;
   day_of_week: string;
   period: number;
@@ -67,6 +71,7 @@ interface LessonInformation {
 }
 
 // /grades/raw_data のレスポンスアイテムの型定義
+// (initializeStudents では使わなくなったが、他で使われる可能性を考慮し残置)
 interface RawDataItemFromGrades {
   student: {
     student_id: number;
@@ -158,56 +163,69 @@ function DashboardPageContent() {
     timeOffsetRef.current = timeOffset;
   }, [timeOffset]);
 
-  // 修正4: 生徒リストの初期化処理 (初回ロード時に一度だけ実行)
+  // ▼▼▼▼▼ 【修正】 生徒リストの初期化処理 (lessonInfo取得後に実行) ▼▼▼▼▼
   useEffect(() => {
-    if (!lessonId || !apiBaseUrl) return;
+    // lessonId と lessonInfo (特に lessonInfo.class_id) がないと実行できない
+    if (!lessonId || !apiBaseUrl || !lessonInfo) return;
 
     // 生徒リストを取得する非同期関数
     const initializeStudents = async () => {
       try {
+        // ★修正★ /classes/{class_id}/students APIを叩く
         const res = await fetch(
-          `${apiBaseUrl}/grades/raw_data?lesson_id=${lessonId}`
+          `${apiBaseUrl}/classes/${lessonInfo.class_id}/students`
         );
-        if (!res.ok) throw new Error('Failed to fetch student list');
-        const data: RawDataItemFromGrades[] = await res.json();
+        if (!res.ok) {
+            // クラスに生徒がいない場合、APIは空リスト[]を返す（classes.py L.43 参照）
+            // もし404や他のエラーが返った場合
+            if (res.status === 404) {
+              console.warn(`生徒データが見つかりません (class_id: ${lessonInfo.class_id})`);
+              setStudents([]); // 空のリストをセット
+              return;
+            }
+            throw new Error(`Failed to fetch student list (Status: ${res.status})`);
+        }
+        
+        // ★修正★ /classes/{class_id}/students のレスポンス型 (StudentInfo[])
+        // schemas.py L.226 StudentInfo (student_id, name, class_id, students_number)
+        const data: { 
+          student_id: number; 
+          name: string; 
+          class_id: number; 
+          students_number: number; 
+        }[] = await res.json();
 
-        // 生徒情報を一意に抽出
-        const studentMap = new Map<number, Student>();
-        data.forEach((item: RawDataItemFromGrades) => {
-          if (!studentMap.has(item.student.student_id)) {
-            studentMap.set(item.student.student_id, {
-              id: item.student.student_id,
-              students_number: item.student.students_number,
-              name: item.student.name,
-              q1: '',
-              q1Progress: 0,
-              q1StartUnix: null,
-              q2: '',
-              q2Progress: 0,
-              q2StartUnix: null,
-              q3: '',
-              q3Progress: 0,
-              q3StartUnix: null,
-              q4: '',
-              q4Progress: 0,
-              q4StartUnix: null,
-            });
-          }
-        });
+        // 取得した生徒データで students state を初期化
+        const initialStudents: Student[] = data.map(item => ({
+          id: item.student_id,
+          students_number: item.students_number,
+          name: item.name,
+          q1: '',
+          q1Progress: 0,
+          q1StartUnix: null,
+          q2: '',
+          q2Progress: 0,
+          q2StartUnix: null,
+          q3: '',
+          q3Progress: 0,
+          q3StartUnix: null,
+          q4: '',
+          q4Progress: 0,
+          q4StartUnix: null,
+        }));
 
-        // students_number でソートしてから state にセット
-        const sortedStudents = Array.from(studentMap.values()).sort(
-          (a, b) => a.students_number - b.students_number
-        );
-        setStudents(sortedStudents); // 生徒リストをセット
+        // APIは既に出席番号順でソートされているはず (classes.py L.38)
+        setStudents(initialStudents); // 生徒リストをセット
 
       } catch (err) {
         console.error('Failed to fetch student data:', err);
+        setStudents([]); // エラー時も空リストをセット
       }
     };
 
     initializeStudents();
-  }, [lessonId]); // lessonId が変わったときだけ実行
+  }, [lessonId, lessonInfo, apiBaseUrl]); // ★ lessonInfo と apiBaseUrl を依存配列に追加
+  // ▲▲▲▲▲ 【修正】 ここまで ▲▲▲▲▲
 
 
   const srcDate = lessonInfo ?? lessonMeta;
@@ -373,7 +391,7 @@ function DashboardPageContent() {
       const serverNowUnix = getServerUnixTime();
       const diff = serverNowUnix - d.answer_start_unix;
 
-      console.log(`📅 Using answer_start_unix: ${d.answer_start_unix}, client: ${clientNowUnix}, server: ${serverNowUnix}, diff: ${diff}s (${(diff/60).toFixed(1)}min), offset: ${timeOffsetRef.current/1000}s`);
+      // console.log(`📅 Using answer_start_unix: ${d.answer_start_unix}, client: ${clientNowUnix}, server: ${serverNowUnix}, diff: ${diff}s (${(diff/60).toFixed(1)}min), offset: ${timeOffsetRef.current/1000}s`);
 
       // 未来のタイムスタンプや異常な値の警告（サーバー時刻基準）
       if (diff < -60) {
@@ -407,9 +425,9 @@ function DashboardPageContent() {
         }
 
         const unixTimestamp = Math.floor(date.getTime() / 1000);
-        const nowUnix = Math.floor(Date.now() / 1000);
-        const diff = nowUnix - unixTimestamp;
-        console.log(`Converted timestamp: ${d.answer_start_timestamp} -> ${unixTimestamp}, diff: ${diff}s`);
+        // const nowUnix = Math.floor(Date.now() / 1000);
+        // const diff = nowUnix - unixTimestamp;
+        // console.log(`Converted timestamp: ${d.answer_start_timestamp} -> ${unixTimestamp}, diff: ${diff}s`);
 
         return unixTimestamp;
       } catch (error) {
@@ -455,7 +473,7 @@ function DashboardPageContent() {
     return 0;
   }, [defaultMinutes, getStartUnix, getServerUnixTime]);
 
-  // 修正5: fetchAllStudentsData を修正 (マッピングの動的生成を追加)
+  // ▼▼▼▼▼ 【修正】 fetchAllStudentsData を修正 (API呼び出しを1回に変更) ▼▼▼▼▼
   const fetchAllStudentsData = useCallback(async () => {
     if (!lessonId || !apiBaseUrl) return;
     const currentStudents = studentsRef.current;
@@ -464,57 +482,46 @@ function DashboardPageContent() {
       return; // 生徒データがまだない場合は何もしない
     }
 
-    const studentIds = currentStudents.map(s => s.id);
-
-    // (A) 全生徒の回答データを取得 (既存ロジック)
-    const allStudentsData = await Promise.all(
-      studentIds.map(async (studentId) => {
-        try {
-          const url = `${apiBaseUrl}/api/answers/?student_id=${studentId}&lesson_id=${lessonId}`;
-          const res = await fetch(url);
-          if (!res.ok) {
-            if (res.status === 404) return { studentId, data: [] };
-            console.error(`Error fetching data for student ${studentId}: ${res.status}`);
-            return { studentId, error: `Status ${res.status}` };
-          }
-          const data: AnswerDataWithDetails[] = await res.json();
-
-          // デバッグ: APIから取得した生データを確認
-          if (data.length > 0) {
-            console.log('🔍 Raw API response for student', studentId, ':', data.map(item => ({
-              question_id: item.question.lesson_question_id,
-              answer_status: item.answer_status,
-              answer_start_unix: item.answer_start_unix,
-              answer_start_timestamp: item.answer_start_timestamp,
-              answer_end_unix: item.answer_end_unix
-            })));
-          }
-
-          return { studentId, data };
-        } catch (error) {
-          console.error(`Error fetching data for student ${studentId}:`, error);
-          return { studentId, error: String(error) };
+    // (A) 全生徒の回答データを1回のAPI呼び出しで取得
+    let allAnswersData: AnswerDataWithDetails[] = [];
+    try {
+      const url = `${apiBaseUrl}/api/answers/?lesson_id=${lessonId}`; // ★ student_id を除去
+      const res = await fetch(url);
+      if (!res.ok) {
+        if (res.status === 404) {
+            console.log("回答データがまだありません (404)");
+            allAnswersData = []; // データがなければ空配列
+        } else {
+          console.error(`Error fetching all answers data: ${res.status}`);
+          return; // エラー時は更新しない
         }
-      })
-    );
+      } else {
+        allAnswersData = await res.json();
+      }
+
+      // デバッグ: APIから取得した生データを確認
+      if (allAnswersData.length > 0) {
+        console.log('🔍 Raw API response (ALL STUDENTS):', allAnswersData.length, 'records');
+      }
+
+    } catch (error) {
+      console.error(`Error fetching all answers data:`, error);
+      return; // エラー時は更新しない
+    }
 
     // (B) マッピングの決定
     let currentMap = dynamicQuestionMapRef.current;
     if (!currentMap) {
         // マップがまだない場合、取得したデータから動的に生成する
         const questionIds = new Set<number>();
-        allStudentsData.forEach(result => {
-            if (result.data) {
-                result.data.forEach(answer => {
-                    questionIds.add(answer.question.lesson_question_id);
-                });
-            }
+        // ★修正★ allAnswersData を直接イテレート
+        allAnswersData.forEach(answer => {
+            questionIds.add(answer.question.lesson_question_id);
         });
 
         // 取得した問題IDをソートし、q1, q2, q3, q4 に割り当てる
         const sortedQuestionIds = Array.from(questionIds).sort((a, b) => a - b);
         
-        // 生徒側ログ（今回）の `question_id: 5, 6, 7, 8` に対応
         const newMap: {
           [id: number]: {
             status: StudentStringKey,
@@ -541,18 +548,29 @@ function DashboardPageContent() {
         // この実行サイクルでは更新された Ref の代わりにローカル変数を使う
     }
 
-    // (C) 画面更新 (既存ロジックだが、参照するマップを変更)
-    setStudents(prevStudents =>
-      prevStudents.map(student => {
-        const result = allStudentsData.find(d => d.studentId === student.id);
-        if (!result || result.error || !result.data) {
+    // (C) 画面更新 (全生徒データをマッピング)
+    setStudents(prevStudents => {
+      // 回答データを生徒IDごとにグループ化
+      const answersByStudent = new Map<number, AnswerDataWithDetails[]>();
+      allAnswersData.forEach(answer => {
+        if (!answersByStudent.has(answer.student_id)) {
+          answersByStudent.set(answer.student_id, []);
+        }
+        answersByStudent.get(answer.student_id)!.push(answer);
+      });
+
+      // prevStudents (生徒の枠) を元に更新
+      return prevStudents.map(student => {
+        const answers = answersByStudent.get(student.id);
+        
+        // この生徒の回答データがない場合は、既存のstudentをそのまま返す
+        if (!answers || answers.length === 0) {
           return student;
         }
 
         const studentUpdate: Partial<Student> = {};
 
-        result.data.forEach(answer => {
-          // ★★★ 修正箇所 ★★★
+        answers.forEach(answer => {
           // ハードコードされたマップの代わりに、動的に生成したマップ(currentMap)を参照する
           const keys = currentMap ? currentMap[answer.question.lesson_question_id] : undefined;
 
@@ -562,7 +580,7 @@ function DashboardPageContent() {
               const startUnixKey = keys.startUnix;
 
               const newProgress = calcProgress(answer);
-              const currentProgress = student[progressKey];
+              // const currentProgress = student[progressKey];
 
               // プログレスバーを常に更新（pencil状態でも確実に更新されるように）
               studentUpdate[progressKey] = newProgress;
@@ -572,18 +590,17 @@ function DashboardPageContent() {
               const newStatus = calcIcon(answer);
 
               // answer_start_unixを保存（リアルタイム進捗バー更新に使用）
-              // getStartUnixを使ってanswer_start_unixまたはanswer_start_timestampから取得
               const startUnixValue = getStartUnix(answer);
               (studentUpdate as Record<string, number | null>)[startUnixKey] = startUnixValue;
 
               // デバッグ: startUnixの保存状況を確認
               if (startUnixValue) {
-                console.log(`Student ${student.id} - ${statusKey}: startUnix set to ${startUnixValue}, status: ${newStatus}`);
+                // console.log(`Student ${student.id} - ${statusKey}: startUnix set to ${startUnixValue}, status: ${newStatus}`);
               } else {
-                console.warn(`Student ${student.id} - ${statusKey}: startUnix is null!`, {
-                  answer_start_unix: answer.answer_start_unix,
-                  answer_start_timestamp: answer.answer_start_timestamp
-                });
+                // console.warn(`Student ${student.id} - ${statusKey}: startUnix is null!`, {
+                //   answer_start_unix: answer.answer_start_unix,
+                //   answer_start_timestamp: answer.answer_start_timestamp
+                // });
               }
 
               // 現在のstatusが「correct」または「wrong」の場合は、新しいstatusに上書きしない
@@ -595,8 +612,9 @@ function DashboardPageContent() {
         // 既存の student データと更新データをマージ
         return { ...student, ...studentUpdate };
       })
-    );
+    });
   }, [lessonId, calcIcon, calcProgress, getStartUnix, apiBaseUrl]);
+  // ▲▲▲▲▲ 【修正】 ここまで ▲▲▲▲▲
 
   // Socket.IOイベントの購読ロジック
   useEffect(() => {
@@ -680,7 +698,7 @@ function DashboardPageContent() {
     const timer = setInterval(() => {
       const currentMap = dynamicQuestionMapRef.current;
       const tickNow = Math.floor(Date.now() / 1000);
-      console.log(`⏱️ Updating progress (5s tick). Map exists: ${!!currentMap}, current unix: ${tickNow}`);
+      // console.log(`⏱️ Updating progress (5s tick). Map exists: ${!!currentMap}, current unix: ${tickNow}`);
       // currentMapがnullの場合でも、固定キー（q1, q2, q3, q4）で進捗を更新
 
       setStudents(prevStudents =>
@@ -706,7 +724,7 @@ function DashboardPageContent() {
                   const diff = nowUnix - startUnix;
                   const newProgress = Math.min(100, (diff / (defaultMinutes * 60)) * 100);
 
-                  console.log(`📊 Student ${student.id} - ${statusKey}: progress ${student[progressKey]}% -> ${newProgress.toFixed(1)}% (diff: ${diff}s)`);
+                  // console.log(`📊 Student ${student.id} - ${statusKey}: progress ${student[progressKey]}% -> ${newProgress.toFixed(1)}% (diff: ${diff}s)`);
 
                   // 進捗が変わった場合のみ更新
                   if (newProgress !== student[progressKey]) {
@@ -714,7 +732,7 @@ function DashboardPageContent() {
                     hasUpdate = true;
                   }
                 } else {
-                  console.warn(`⚠️ Student ${student.id} - ${statusKey}: pencil status but no startUnix (${student[startUnixKey]})`);
+                  // console.warn(`⚠️ Student ${student.id} - ${statusKey}: pencil status but no startUnix (${student[startUnixKey]})`);
                 }
               }
             });
@@ -744,7 +762,7 @@ function DashboardPageContent() {
                   const diff = nowUnix - startUnix;
                   const newProgress = Math.min(100, (diff / (defaultMinutes * 60)) * 100);
 
-                  console.log(`📊 [Fixed] Student ${student.id} - ${statusKey}: progress ${student[progressKey]}% -> ${newProgress.toFixed(1)}% (diff: ${diff}s)`);
+                  // console.log(`📊 [Fixed] Student ${student.id} - ${statusKey}: progress ${student[progressKey]}% -> ${newProgress.toFixed(1)}% (diff: ${diff}s)`);
 
                   // 進捗が変わった場合のみ更新
                   if (newProgress !== student[progressKey]) {
@@ -752,7 +770,7 @@ function DashboardPageContent() {
                     hasUpdate = true;
                   }
                 } else {
-                  console.warn(`⚠️ [Fixed] Student ${student.id} - ${statusKey}: pencil status but no startUnix (${student[startUnixKey]})`);
+                  // console.warn(`⚠️ [Fixed] Student ${student.id} - ${statusKey}: pencil status but no startUnix (${student[startUnixKey]})`);
                 }
               }
             });
