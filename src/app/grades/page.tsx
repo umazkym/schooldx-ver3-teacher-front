@@ -339,6 +339,22 @@ export default function GradesPage() {
                      .slice(0, 5);
     }, [comments]);
 
+    const groupedStats = useMemo(() => {
+        if (!statistics) return {};
+        const questionStatsArray = Object.values(statistics.questionStats);
+        // Sort by lesson_theme_contents_id to ensure consistent ordering
+        questionStatsArray.sort((a, b) => (a.lesson_theme_contents_id || 0) - (b.lesson_theme_contents_id || 0));
+
+        return questionStatsArray.reduce((acc, stats) => {
+            const unitName = stats.unit_name || 'その他';
+            if (!acc[unitName]) {
+                acc[unitName] = [];
+            }
+            acc[unitName].push(stats);
+            return acc;
+        }, {} as { [unitName: string]: QuestionStats[] });
+    }, [statistics]);
+
 
     const selectedLesson = lessons.find(l => l.lesson_id === parseInt(selectedLessonId));
     const selectedClass = classes.find(c => c.class_id === parseInt(selectedClassId));
@@ -447,14 +463,19 @@ export default function GradesPage() {
                         {Object.keys(statistics.questionStats).length === 0 ? (
                             <p className="text-gray-500 text-center">この授業には分析対象の問題データがありません。</p>
                         ) : (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-8">
-                                {Object.entries(statistics.questionStats).map(([label, stats]) => {
-                                    // gradeSummaryが存在し、該当するquestion_idのデータを探す
-                                    const gradeAvgItem = gradeSummary?.find(item => item.question_id === stats.question_id);
-                                     // gradeAvgItemが存在する場合のみcorrect_rateを渡す
-                                    const gradeAvgRate = gradeAvgItem?.correct_rate;
-                                    return <QuestionDetailCard key={label} label={label} stats={stats} gradeAvg={gradeAvgRate} />;
-                                })}
+                            <div className="space-y-8">
+                                {Object.entries(groupedStats).map(([unitName, statsList]) => (
+                                    <div key={unitName}>
+                                        <h3 className="text-lg font-semibold text-gray-700 mb-4 border-b pb-2">{unitName}</h3>
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-8">
+                                            {statsList.map((stats, index) => {
+                                                const gradeAvgItem = gradeSummary?.find(item => item.question_id === stats.question_id);
+                                                const gradeAvgRate = gradeAvgItem?.correct_rate;
+                                                return <QuestionDetailCard key={stats.question_label} label={stats.question_label} stats={stats} gradeAvg={gradeAvgRate} questionNumber={index + 1} />;
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </section>
@@ -498,8 +519,7 @@ const SummaryCard = ({ title, value, color, description, isProblemCard }: { titl
     );
 };
 
-// QuestionDetailCard コンポーネントは変更なし
-const QuestionDetailCard = ({ label, stats, gradeAvg }: { label: string, stats: QuestionStats, gradeAvg?: number | null }) => { // gradeAvgをnull許容に
+const QuestionDetailCard = ({ label, stats, gradeAvg, questionNumber }: { label: string, stats: QuestionStats, gradeAvg?: number | null, questionNumber?: number }) => { // gradeAvgをnull許容に
     const correctRate = stats.total > 0 ? (stats.correct / stats.total) * 100 : 0;
     const rateColor = correctRate >= 80 ? 'green' : correctRate >= 50 ? 'orange' : 'red';
     const rateClasses = {
@@ -522,8 +542,7 @@ const QuestionDetailCard = ({ label, stats, gradeAvg }: { label: string, stats: 
                 <div className="flex flex-wrap justify-between items-baseline gap-2" title={`元のラベル: ${label}`}>
                     <h3 className="font-bold text-base text-gray-800">
                         {fullQuestionLabel || label}
-                        {/* ★ 追加: IDを表示 */}
-                        {stats.lesson_theme_contents_id && <span className="text-gray-500 font-normal text-sm ml-2">(ID: {stats.lesson_theme_contents_id})</span>}
+                        {questionNumber && <span className="text-gray-500 font-normal text-sm ml-2">問{questionNumber}</span>}
                     </h3>
                     <div className="flex items-baseline gap-2 text-xs flex-shrink-0">
                         <span className={rateClasses[rateColor]}>クラス: {Math.round(correctRate)}%</span>
