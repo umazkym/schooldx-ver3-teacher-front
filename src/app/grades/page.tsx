@@ -277,24 +277,37 @@ export default function GradesPage() {
         let bestQuestion = "N/A", worstQuestion = "N/A";
         let bestRate = -1, worstRate = 101;
 
-        Object.values(questionStats).forEach(stats => {
-            const rate = stats.total > 0 ? (stats.correct / stats.total) * 100 : 0;
+        const questionStatsArray = Object.values(questionStats);
+        questionStatsArray.sort((a, b) => (a.lesson_theme_contents_id || 0) - (b.lesson_theme_contents_id || 0));
 
-            const fullLabel = [stats.part_name, stats.chapter_name, stats.unit_name, stats.lesson_theme_name]
-                .filter(Boolean) // null や空文字列を除外
-                .join(" - ");
-
-            if (stats.total > 0) { // 回答がある問題のみ比較対象とする
-                if (rate > bestRate) {
-                    bestRate = rate;
-                    bestQuestion = fullLabel || stats.question_label;
-                }
-                 // worstRateの初期値が101なので、rateが100でも更新される
-                if (rate < worstRate) {
-                    worstRate = rate;
-                    worstQuestion = fullLabel || stats.question_label;
-                }
+        const tempGroupedStats = questionStatsArray.reduce((acc, stats) => {
+            const unitName = stats.unit_name || 'その他';
+            if (!acc[unitName]) {
+                acc[unitName] = [];
             }
+            acc[unitName].push(stats);
+            return acc;
+        }, {} as { [unitName: string]: QuestionStats[] });
+
+        Object.values(tempGroupedStats).forEach(statsList => {
+            statsList.forEach((stats, index) => {
+                const rate = stats.total > 0 ? (stats.correct / stats.total) * 100 : 0;
+
+                const fullLabel = [stats.part_name, stats.chapter_name, stats.unit_name, stats.lesson_theme_name]
+                    .filter(Boolean) // null や空文字列を除外
+                    .join(" - ");
+
+                if (stats.total > 0) { // 回答がある問題のみ比較対象とする
+                    if (rate > bestRate) {
+                        bestRate = rate;
+                        bestQuestion = `${fullLabel || stats.question_label} 問${index + 1}`;
+                    }
+                    if (rate < worstRate) {
+                        worstRate = rate;
+                        worstQuestion = `${fullLabel || stats.question_label} 問${index + 1}`;
+                    }
+                }
+            });
         });
 
         let gradeAverage = -1; // デフォルト値を -1 に変更
@@ -354,6 +367,16 @@ export default function GradesPage() {
             return acc;
         }, {} as { [unitName: string]: QuestionStats[] });
     }, [statistics]);
+
+    const unitMaxTimes = useMemo(() => {
+        const maxTimes: { [unitName: string]: number } = {};
+        Object.entries(groupedStats).forEach(([unitName, statsList]: [string, QuestionStats[]]) => {
+            const allTimes = statsList.flatMap(stats => [...stats.correctTimes, ...stats.incorrectTimes]);
+            const maxObservedTime = allTimes.length > 0 ? Math.max(...allTimes) : 0;
+            maxTimes[unitName] = Math.max(30, Math.ceil(maxObservedTime / 10) * 10);
+        });
+        return maxTimes;
+    }, [groupedStats]);
 
 
     const selectedLesson = lessons.find(l => l.lesson_id === parseInt(selectedLessonId));
@@ -471,9 +494,9 @@ export default function GradesPage() {
                                             {statsList.map((stats, index) => {
                                                 const gradeAvgItem = gradeSummary?.find(item => item.question_id === stats.question_id);
                                                 const gradeAvgRate = gradeAvgItem?.correct_rate;
-                                                return <QuestionDetailCard key={stats.question_label} label={stats.question_label} stats={stats} gradeAvg={gradeAvgRate} questionNumber={index + 1} />;
-                                            })}
-                                        </div>
+                                                const unitMaxTime = unitMaxTimes[unitName];
+                                                return <QuestionDetailCard key={stats.question_label} label={stats.question_label} stats={stats} gradeAvg={gradeAvgRate} questionNumber={index + 1} maxTime={unitMaxTime} />;
+                                            })}                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -519,7 +542,7 @@ const SummaryCard = ({ title, value, color, description, isProblemCard }: { titl
     );
 };
 
-const QuestionDetailCard = ({ label, stats, gradeAvg, questionNumber }: { label: string, stats: QuestionStats, gradeAvg?: number | null, questionNumber?: number }) => { // gradeAvgをnull許容に
+const QuestionDetailCard = ({ label, stats, gradeAvg, questionNumber, maxTime }: { label: string, stats: QuestionStats, gradeAvg?: number | null, questionNumber?: number, maxTime: number }) => { // gradeAvgをnull許容に
     const correctRate = stats.total > 0 ? (stats.correct / stats.total) * 100 : 0;
     const rateColor = correctRate >= 80 ? 'green' : correctRate >= 50 ? 'orange' : 'red';
     const rateClasses = {
@@ -577,14 +600,14 @@ const QuestionDetailCard = ({ label, stats, gradeAvg, questionNumber }: { label:
                     })}
                 </div>
             </div>
-            <AnswerTimeDistribution stats={stats} />
+            <AnswerTimeDistribution stats={stats} maxTime={maxTime} />
         </div>
     );
 };
 
 
 // AnswerTimeDistribution, DotPlot, KeywordMap, CommentsList コンポーネントは変更なし
-const AnswerTimeDistribution = ({ stats }: { stats: QuestionStats }) => {
+const AnswerTimeDistribution = ({ stats, maxTime }: { stats: QuestionStats, maxTime: number }) => {
     // ゼロ除算を避ける
     const avgCorrect = stats.correctTimes.length > 0 ? Math.round(stats.correctTimes.reduce((a, b) => a + b, 0) / stats.correctTimes.length) : null;
     const avgIncorrect = stats.incorrectTimes.length > 0 ? Math.round(stats.incorrectTimes.reduce((a, b) => a + b, 0) / stats.incorrectTimes.length) : null;
@@ -620,15 +643,14 @@ const AnswerTimeDistribution = ({ stats }: { stats: QuestionStats }) => {
             </div>
             <div className="space-y-3 text-xs flex-grow"> {/* space-yを調整 */}
                  {/* 正解者のドットプロット */}
-                <DotPlot title={correctTitle} times={stats.correctTimes} color="green" avgTime={avgCorrect} />
+                <DotPlot title={correctTitle} times={stats.correctTimes} color="green" avgTime={avgCorrect} maxTime={maxTime} />
                  {/* 不正解者のドットプロット */}
-                <DotPlot title={incorrectTitle} times={stats.incorrectTimes} color="gray" avgTime={avgIncorrect} />
+                <DotPlot title={incorrectTitle} times={stats.incorrectTimes} color="gray" avgTime={avgIncorrect} maxTime={maxTime} />
             </div>
         </div>
     );
 };
-const DotPlot = ({ title, times, color, avgTime }: { title: string, times: number[], color: 'green' | 'gray', avgTime: number | null }) => { // avgTimeをnull許容に
-    const maxTime = 600; // X軸の最大値（秒）
+const DotPlot = ({ title, times, color, avgTime, maxTime }: { title: string, times: number[], color: 'green' | 'gray', avgTime: number | null, maxTime: number }) => {
     const timeCounts: { [time: number]: number } = {};
     times.forEach(t => {
          // 10秒ごとに丸める
@@ -645,7 +667,7 @@ const DotPlot = ({ title, times, color, avgTime }: { title: string, times: numbe
                     {Object.entries(timeCounts).map(([timeStr, count]) => {
                         const time = Number(timeStr);
                          // 最大値を超えないように位置を計算
-                        const position = Math.min(100, Math.max(0, (time / maxTime) * 100));
+                        const position = maxTime > 0 ? Math.min(100, Math.max(0, (time / maxTime) * 100)) : 0;
                         return Array.from({ length: Math.min(count, 5) }).map((_, i) => ( // 最大5段まで表示
                              <span
                                 key={`${time}-${i}`}
@@ -662,11 +684,11 @@ const DotPlot = ({ title, times, color, avgTime }: { title: string, times: numbe
                     <div className="absolute bottom-2 left-0 right-0 h-px bg-gray-300"></div> {/* axis-line */}
                      {/* X軸ラベル */}
                     <span className="absolute bottom-[-4px] text-[9px] text-gray-500 transform -translate-x-1/2" style={{ left: '0%' }}>0s</span> {/* axis-label */}
-                    <span className="absolute bottom-[-4px] text-[9px] text-gray-500 transform -translate-x-1/2" style={{ left: '50%' }}>300s</span> {/* axis-label */}
-                    <span className="absolute bottom-[-4px] text-[9px] text-gray-500 transform -translate-x-1/2" style={{ left: '100%' }}>600s</span> {/* axis-label */}
+                    <span className="absolute bottom-[-4px] text-[9px] text-gray-500 transform -translate-x-1/2" style={{ left: '50%' }}>{Math.round(maxTime / 2)}s</span> {/* axis-label */}
+                    <span className="absolute bottom-[-4px] text-[9px] text-gray-500 transform -translate-x-1/2" style={{ left: '100%' }}>{maxTime}s</span> {/* axis-label */}
                     {/* 平均マーカー */}
                      {avgTime !== null && times.length > 0 && ( // avgTimeがnullでない場合のみ表示
-                        <div className="absolute bottom-2 w-3 h-3 transform -translate-x-1/2 translate-y-1/2" style={{ left: `${Math.min(100, Math.max(0, (avgTime / maxTime) * 100))}%` }} title={`平均: ${avgTime}秒`}> {/* avg-marker */}
+                        <div className="absolute bottom-2 w-3 h-3 transform -translate-x-1/2 translate-y-1/2" style={{ left: `${maxTime > 0 ? Math.min(100, Math.max(0, (avgTime / maxTime) * 100)) : 0}%` }} title={`平均: ${avgTime}秒`}> {/* avg-marker */}
                             <svg className={`w-full h-full ${color === 'green' ? 'text-green-600' : 'text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20">
                                 <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
                             </svg>
