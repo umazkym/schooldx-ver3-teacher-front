@@ -32,6 +32,7 @@ type RawDataItem = {
         chapter_name: string | null;
         unit_name: string | null;
         lesson_theme_name: string | null;
+        lesson_theme_contents_id: number | null; // ★ 追加
     };
     answer: { selected_choice: string | null; is_correct: boolean | null; start_unix: number | null; end_unix: number | null; };
 };
@@ -53,6 +54,7 @@ type QuestionStats = {
     chapter_name: string | null;
     unit_name: string | null;
     lesson_theme_name: string | null;
+    lesson_theme_contents_id: number | null; // ★ 追加
     correct: number;
     total: number;
     choiceDistribution: { [choice: string]: number };
@@ -244,6 +246,7 @@ export default function GradesPage() {
                     chapter_name: item.question.chapter_name,
                     unit_name: item.question.unit_name,
                     lesson_theme_name: item.question.lesson_theme_name,
+                    lesson_theme_contents_id: item.question.lesson_theme_contents_id, // ★ 追加
                     correct: 0, total: 0,
                     choiceDistribution: { A: 0, B: 0, C: 0, D: 0 },
                     correctChoice: item.question.correct_choice,
@@ -517,7 +520,11 @@ const QuestionDetailCard = ({ label, stats, gradeAvg }: { label: string, stats: 
             <div>
                  {/* title属性に元のラベルを表示 */}
                 <div className="flex flex-wrap justify-between items-baseline gap-2" title={`元のラベル: ${label}`}>
-                    <h3 className="font-bold text-base text-gray-800">{fullQuestionLabel || label}</h3> {/* fullQuestionLabelが空なら元のlabelを使う */}
+                    <h3 className="font-bold text-base text-gray-800">
+                        {fullQuestionLabel || label}
+                        {/* ★ 追加: IDを表示 */}
+                        {stats.lesson_theme_contents_id && <span className="text-gray-500 font-normal text-sm ml-2">(ID: {stats.lesson_theme_contents_id})</span>}
+                    </h3>
                     <div className="flex items-baseline gap-2 text-xs flex-shrink-0">
                         <span className={rateClasses[rateColor]}>クラス: {Math.round(correctRate)}%</span>
                         {/* gradeAvgがnullまたはundefinedでない場合のみ表示 */}
