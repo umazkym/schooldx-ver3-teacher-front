@@ -331,20 +331,8 @@ export default function GradesPage() {
         return { classAverage, questionStats, bestQuestion, worstQuestion, gradeAverage };
     }, [rawData, gradeSummary, selectedLessonId]);
 
-    // --- keywordAnalysis (useMemo) (変更なし) ---
-    const keywordAnalysis = useMemo(() => {
-        const keywords: { [key: string]: number } = {};
-        comments.forEach(c => {
-            if (c.comment_text) {
-                c.comment_text.match(/[\p{L}\p{N}_]+/gu)?.forEach(word => {
-                    keywords[word] = (keywords[word] || 0) + 1;
-                });
-            }
-        });
-        return Object.entries(keywords)
-                     .sort((a, b) => b[1] - a[1])
-                     .slice(0, 5);
-    }, [comments]);
+    // --- keywordAnalysis (useMemo) (★ 削除) ---
+    // (削除)
 
     // --- groupedStats (useMemo) (変更なし) ---
     const groupedStats = useMemo(() => {
@@ -390,7 +378,7 @@ export default function GradesPage() {
         }
     };
 
-    // --- JSX (メインコンポーネント) (変更なし) ---
+    // --- JSX (メインコンポーネント) ---
     return (
         <div className="p-4 sm:p-6 md:p-8 bg-[#f4f7f9] min-h-screen">
              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -449,7 +437,7 @@ export default function GradesPage() {
                 <main className="space-y-8">
                     <div className="bg-white p-4 rounded-xl shadow-sm">
                         <h1 className="text-2xl font-bold text-gray-800">
-                            {selectedAcademicYear}年度 {selectedClass?.class_name || 'クラス情報なし'} {selectedLesson?.lesson_name || '授業情報なし'} 学習結果分析
+                            {selectedAcademicYear}年度 {selectedClass?.class_name || 'クラス情報なし'} {selectedLesson?.lesson_name || '授業情報なし'} 
                         </h1>
                         <p className="text-gray-500">
                             {selectedLesson ? `${formatDate(selectedLesson.date)} ${selectedLesson.period}限` : '日付情報なし'}
@@ -493,16 +481,25 @@ export default function GradesPage() {
                         )}
                     </section>
 
+                     {/* ▼▼▼ 定性（アンケート）分析セクションのレイアウト修正 ▼▼▼ */}
                      <section className="bg-white p-6 rounded-xl shadow-sm">
-                         <h2 className="text-xl font-bold text-gray-800 pb-2 mb-6 border-b-2 border-gray-200">定性（アンケート）分析</h2>
+                         <h2 className="text-xl font-bold text-gray-800 pb-2 mb-6 border-b-2 border-gray-200">アンケート分析</h2>
+                         {/* グリッドコンテナーに `md:grid-rows-1` を追加し、
+                           `SurveySummaryChart` と `CommentsList` の親 `div` が高さを揃えるようにする 
+                           ただし、`SurveySummaryChart` の内部の高さが可変なため、
+                           `CommentsList` 側で高さを調整する方が確実
+                         */}
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                             {/* 左側: アンケートグラフ */}
                              <SurveySummaryChart summary={surveySummary} />
-                             <div className="space-y-8">
-                                 <KeywordMap keywords={keywordAnalysis} />
+                             
+                             {/* 右側: コメントリスト (高さを揃えるためにラッパーを追加) */}
+                             <div className="flex flex-col">
                                  <CommentsList comments={comments} />
                              </div>
                          </div>
                      </section>
+                     {/* ▲▲▲ 修正ここまで ▲▲▲ */}
                 </main>
             )}
         </div>
@@ -531,7 +528,7 @@ const SummaryCard = ({ title, value, color, description, isProblemCard }: { titl
     );
 };
 
-// --- QuestionDetailCard コンポーネント (★ 改善) ---
+// --- QuestionDetailCard コンポーネント (変更なし) ---
 const QuestionDetailCard = ({ label, stats, gradeAvg, questionNumber, maxTime }: { label: string, stats: QuestionStats, gradeAvg?: number | null, questionNumber?: number, maxTime: number }) => {
     const correctRate = stats.total > 0 ? (stats.correct / stats.total) * 100 : 0;
     const rateColor = correctRate >= 80 ? 'green' : correctRate >= 50 ? 'orange' : 'red';
@@ -558,14 +555,12 @@ const QuestionDetailCard = ({ label, stats, gradeAvg, questionNumber, maxTime }:
                         {questionNumber && <span className="font-bold text-base text-gray-800 ml-2 flex-shrink-0">問{questionNumber}</span>}
                     </div>
                     
-                    {/* ▼▼▼ 修正: ラベルを「クラス正答率」「学年正答率」に変更 ▼▼▼ */}
                     <div className="flex items-baseline gap-2 text-xs flex-shrink-0 self-end">
                         <span className={rateClasses[rateColor]}>クラス正答率: {Math.round(correctRate)}%</span>
                         <span className="font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
                            学年正答率: {gradeAvg != null ? `${Math.round(gradeAvg)}%` : "データなし"}
                         </span>
                     </div>
-                    {/* ▲▲▲ 修正ここまで ▲▲▲ */}
                 </div>
             </div>
             <div>
@@ -577,7 +572,6 @@ const QuestionDetailCard = ({ label, stats, gradeAvg, questionNumber, maxTime }:
                         return (
                             <div key={choice} className="flex items-center gap-2">
                                 <span className={`w-6 text-center ${isCorrect ? 'font-bold text-green-600' : 'text-gray-700'}`}>{choice}</span>
-                                {/* ▼▼▼ 修正: 0%でもテキストが見えるように調整 ▼▼▼ */}
                                 <div className={`flex-grow ${isCorrect ? 'bg-green-100' : 'bg-gray-100'} rounded-full h-3 relative overflow-hidden`}>
                                     {percentage > 0 && (
                                         <div className={`${isCorrect ? 'bg-green-400' : 'bg-gray-400'} h-full rounded-full absolute top-0 left-0`} style={{ width: `${percentage}%` }}></div>
@@ -586,7 +580,6 @@ const QuestionDetailCard = ({ label, stats, gradeAvg, questionNumber, maxTime }:
                                         {Math.round(percentage)}%
                                     </span>
                                 </div>
-                                {/* ▲▲▲ 修正ここまで ▲▲▲ */}
                                 <span className={`w-10 text-right ${isCorrect ? 'text-green-600 font-bold' : 'text-transparent'}`}>{isCorrect ? '(正解)' : ''}</span>
                             </div>
                         );
@@ -599,7 +592,7 @@ const QuestionDetailCard = ({ label, stats, gradeAvg, questionNumber, maxTime }:
 };
 
 
-// --- AnswerTimeDistribution コンポーネント (★ 改善) ---
+// --- AnswerTimeDistribution コンポーネント (変更なし) ---
 const AnswerTimeDistribution = ({ stats, maxTime }: { stats: QuestionStats, maxTime: number }) => {
     const avgCorrect = stats.correctTimes.length > 0 ? Math.round(stats.correctTimes.reduce((a, b) => a + b, 0) / stats.correctTimes.length) : null;
     const avgIncorrect = stats.incorrectTimes.length > 0 ? Math.round(stats.incorrectTimes.reduce((a, b) => a + b, 0) / stats.incorrectTimes.length) : null;
@@ -611,7 +604,6 @@ const AnswerTimeDistribution = ({ stats, maxTime }: { stats: QuestionStats, maxT
         <div className="flex-grow flex flex-col mt-2">
             <div className="flex justify-between items-center mb-1">
                 <p className="font-semibold text-xs text-gray-600">回答時間 分布</p>
-                {/* ▼▼▼ 修正: 凡例の文字サイズを text-xs に統一 ▼▼▼ */}
                 <div className="flex items-center gap-3 text-xs text-gray-500">
                     {(avgCorrect !== null || avgIncorrect !== null) && (
                         <div className="flex items-center gap-1">
@@ -628,7 +620,6 @@ const AnswerTimeDistribution = ({ stats, maxTime }: { stats: QuestionStats, maxT
                         <span>不正解</span>
                     </div>
                 </div>
-                {/* ▲▲▲ 修正ここまで ▲▲▲ */}
             </div>
             <div className="space-y-3 text-xs flex-grow">
                 <DotPlot title={correctTitle} times={stats.correctTimes} color="green" avgTime={avgCorrect} maxTime={maxTime} />
@@ -638,7 +629,7 @@ const AnswerTimeDistribution = ({ stats, maxTime }: { stats: QuestionStats, maxT
     );
 };
 
-// --- DotPlot コンポーネント (★ 改善) ---
+// --- DotPlot コンポーネント (変更なし) ---
 const DotPlot = ({ title, times, color, avgTime, maxTime }: { title: string, times: number[], color: 'green' | 'gray', avgTime: number | null, maxTime: number }) => {
     const timeCounts: { [time: number]: number } = {};
     times.forEach(t => {
@@ -655,38 +646,34 @@ const DotPlot = ({ title, times, color, avgTime, maxTime }: { title: string, tim
                         const time = Number(timeStr);
                         const position = maxTime > 0 ? Math.min(100, Math.max(0, (time / maxTime) * 100)) : 0;
                         return Array.from({ length: Math.min(count, 5) }).map((_, i) => (
-                             // ▼▼▼ 修正: ドットのサイズと間隔を調整 ▼▼▼
                              <span
                                 key={`${time}-${i}`}
                                 className={`absolute bottom-0 w-2 h-2 rounded-full transform -translate-x-1/2 ${color === 'green' ? 'bg-green-400' : 'bg-gray-400'} dot dot-stack-${i + 1}`}
-                                style={{ left: `${position}%`, bottom: `${i * 9}px` }} // 7px -> 9px
+                                style={{ left: `${position}%`, bottom: `${i * 9}px` }} 
                                 title={`${time}秒 (${count}人)`}
                             ></span>
-                            // ▲▲▲ 修正ここまで ▲▲▲
                         ));
                     })}
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 h-4">
-                     {/* ▼▼▼ 修正: 軸線を濃く、ラベルを大きく ▼▼▼ */}
-                    <div className="absolute bottom-2 left-0 right-0 h-px bg-gray-400"></div> {/* bg-gray-300 -> bg-gray-400 */}
-                    <span className="absolute bottom-[-4px] text-xs text-gray-500 transform -translate-x-1/2" style={{ left: '0%' }}>0s</span> {/* text-[10px] -> text-xs */}
-                    <span className="absolute bottom-[-4px] text-xs text-gray-500 transform -translate-x-1/2" style={{ left: '50%' }}>{Math.round(maxTime / 2)}s</span> {/* text-[10px] -> text-xs */}
-                    <span className="absolute bottom-[-4px] text-xs text-gray-500 transform -translate-x-1/2" style={{ left: '100%' }}>{maxTime}s</span> {/* text-[10px] -> text-xs */}
+                    <div className="absolute bottom-2 left-0 right-0 h-px bg-gray-400"></div> 
+                    <span className="absolute bottom-[-4px] text-xs text-gray-500 transform -translate-x-1/2" style={{ left: '0%' }}>0s</span> 
+                    <span className="absolute bottom-[-4px] text-xs text-gray-500 transform -translate-x-1/2" style={{ left: '50%' }}>{Math.round(maxTime / 2)}s</span> 
+                    <span className="absolute bottom-[-4px] text-xs text-gray-500 transform -translate-x-1/2" style={{ left: '100%' }}>{maxTime}s</span> 
                      {avgTime !== null && times.length > 0 && (
-                        <div className="absolute bottom-2 w-3.5 h-3.5 transform -translate-x-1/2 translate-y-1/2" style={{ left: `${maxTime > 0 ? Math.min(100, Math.max(0, (avgTime / maxTime) * 100)) : 0}%` }} title={`平均: ${avgTime}秒`}> {/* w-3 h-3 -> w-3.5 h-3.5 */}
+                        <div className="absolute bottom-2 w-3.5 h-3.5 transform -translate-x-1/2 translate-y-1/2" style={{ left: `${maxTime > 0 ? Math.min(100, Math.max(0, (avgTime / maxTime) * 100)) : 0}%` }} title={`平均: ${avgTime}秒`}> 
                             <svg className={`w-full h-full ${color === 'green' ? 'text-green-600' : 'text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20">
                                 <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
                             </svg>
                         </div>
                     )}
-                    {/* ▲▲▲ 修正ここまで ▲▲▲ */}
                 </div>
             </div>
         </div>
     );
 };
 
-// --- SurveySummaryChart コンポーネント (★ 改善) ---
+// --- SurveySummaryChart コンポーネント (変更なし) ---
 const SurveySummaryChart = ({ summary }: { summary: LessonSurveySummary | null }) => {
     if (!summary || (Object.keys(summary.understanding_level_distribution).length === 0 && Object.keys(summary.difficulty_point_distribution).length === 0)) {
         return (
@@ -739,8 +726,7 @@ const SurveySummaryChart = ({ summary }: { summary: LessonSurveySummary | null }
                         const percentage = total > 0 ? (value / total) * 100 : 0;
                         return (
                             <div key={key} className="flex items-center gap-2">
-                                <span className="w-32 text-right text-gray-700">{label}</span>
-                                {/* ▼▼▼ 修正: 0%でもテキストが見えるように調整 ▼▼▼ */}
+                                <span className="w-36 text-right text-gray-700">{label}</span>
                                 <div className="flex-grow bg-gray-200 rounded-full h-4 relative overflow-hidden">
                                     {percentage > 0 && (
                                         <div className="bg-sky-400 h-full rounded-full absolute top-0 left-0" style={{ width: `${percentage}%` }}></div>
@@ -749,7 +735,6 @@ const SurveySummaryChart = ({ summary }: { summary: LessonSurveySummary | null }
                                         {Math.round(percentage)}% ({value})
                                     </span>
                                 </div>
-                                {/* ▲▲▲ 修正ここまで ▲▲▲ */}
                             </div>
                         );
                     })}
@@ -760,84 +745,38 @@ const SurveySummaryChart = ({ summary }: { summary: LessonSurveySummary | null }
 
     return (
         <div className="space-y-6">
-            {renderBarChart('授業の理解度', summary.understanding_level_distribution, understandingLabels)}
-            {renderBarChart('授業の難易度', summary.difficulty_point_distribution, difficultyLabels)}
+            {renderBarChart('問題の理解度', summary.understanding_level_distribution, understandingLabels)}
+            {renderBarChart('問題の難易度', summary.difficulty_point_distribution, difficultyLabels)}
         </div>
     );
 };
 
-// --- KeywordMap (変更なし) ---
-const KeywordMap = ({ keywords }: { keywords: [string, number][] }) => {
-    if (!keywords || keywords.length === 0 || keywords.every(([word, count]) => count <= 0)) {
-        return (
-            <div>
-                <h3 className="font-semibold text-gray-700 mb-3 text-center text-sm">キーワードマップ</h3>
-                <div className="flex items-center justify-center p-4 border bg-gray-50 rounded-lg min-h-[180px] text-gray-500 text-xs">
-                    コメントからキーワードは抽出されませんでした。
-                </div>
-            </div>
-        );
-    }
-
-    const maxCount = Math.max(1, ...keywords.map(k => k[1]));
-
-    const getStyle = (count: number) => {
-        const baseSize = 0.8;
-        const maxSize = 1.5;
-        const factor = Math.log(count + 1) / Math.log(maxCount + 1);
-        const size = baseSize + (maxSize - baseSize) * factor;
-
-        const minOpacity = 0.5;
-        const maxOpacity = 1.0;
-        const opacityFactor = count / maxCount;
-        const opacity = minOpacity + (maxOpacity - minOpacity) * opacityFactor;
-
-        return {
-            fontSize: `${size}rem`,
-            lineHeight: 1.2,
-            opacity: opacity,
-            margin: '0.2rem 0.4rem',
-            display: 'inline-block',
-            };
-    };
-    return (
-        <div>
-            <h3 className="font-semibold text-gray-700 mb-3 text-center text-sm">キーワードマップ</h3>
-            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 p-4 border bg-gray-50 rounded-lg min-h-[180px]">
-                {keywords.map(([word, count]) => (
-                    <span key={word} className="text-sky-800 font-medium" style={getStyle(count)} title={`出現回数: ${count}`}>
-                        {word}
-                    </span>
-                ))}
-            </div>
-        </div>
-    );
-};
 
 // --- CommentsList コンポーネント (★ 改善) ---
 const CommentsList = ({ comments }: { comments: CommentData[] }) => {
     const validComments = comments.filter(c => c.comment_text && c.comment_text.trim().length > 0);
 
     return (
-        <div>
-            {/* ▼▼▼ 修正: タイトルを変更 ▼▼▼ */}
-            <h3 className="font-semibold text-gray-700 mb-3 text-center text-sm">主なコメント</h3>
-            {/* ▲▲▲ 修正ここまで ▲▲▲ */}
-            <div className="space-y-2">
+        // ▼▼▼ 高さを指定し、スクロールを追加 ▼▼▼
+        <div className="flex flex-col h-full"> {/* 親のグリッドアイテム(div)が h-full (またはflex) である想定 */}
+            <h3 className="font-semibold text-gray-700 mb-3 text-center text-sm flex-shrink-0">主なコメント</h3>
+            
+            {/* スクロール可能な領域 (flex-1 で残りの高さをすべて使う) */}
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-2 bg-gray-50 border rounded-lg p-4">
                 {validComments.length > 0 ? (
-                    validComments.slice(0, 3).map((c, i) => (
-                        // ▼▼▼ 修正: コメントの文字サイズを大きく ▼▼▼
-                        <div key={c.student_id + '-' + i} className="bg-gray-100 p-3 rounded-lg text-sm text-gray-800 shadow-sm"> {/* text-xs -> text-sm */}
+                    validComments.map((c, i) => ( // ★ slice(0, 3) を削除
+                        <div key={c.student_id + '-' + i} className="bg-white p-3 rounded-lg text-sm text-gray-800 shadow-sm border border-gray-200"> 
                             「{c.comment_text}」
                         </div>
-                        // ▲▲▲ 修正ここまで ▲▲▲
                     ))
                 ) : (
-                    <div className="text-gray-500 text-xs text-center bg-gray-50 rounded-lg p-4 min-h-[180px] flex items-center justify-center border">
+                    // コメントがない場合も高さを維持して中央に表示
+                    <div className="text-gray-500 text-xs text-center rounded-lg h-full flex items-center justify-center">
                         有効なコメントはありませんでした。
                     </div>
                 )}
             </div>
         </div>
+        // ▲▲▲ 修正ここまで ▲▲▲
     );
 };
