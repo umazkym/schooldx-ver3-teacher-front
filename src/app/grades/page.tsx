@@ -47,6 +47,11 @@ type GradeSummaryItem = {
 
 type CommentData = { student_id: number; student_name: string; comment_text: string | null; };
 
+type LessonSurveySummary = {
+    understanding_level_distribution: { [key: string]: number };
+    difficulty_point_distribution: { [key: string]: number };
+};
+
 type QuestionStats = {
     question_id: number;
     question_label: string;
@@ -83,6 +88,7 @@ export default function GradesPage() {
     const [rawData, setRawData] = useState<RawDataItem[]>([]);
     const [comments, setComments] = useState<CommentData[]>([]);
     const [gradeSummary, setGradeSummary] = useState<GradeSummaryItem[]>([]);
+    const [surveySummary, setSurveySummary] = useState<LessonSurveySummary | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -171,6 +177,7 @@ export default function GradesPage() {
             setRawData([]);
             setComments([]);
             setGradeSummary([]);
+            setSurveySummary(null);
             return;
         };
         const fetchGradesData = async () => {
@@ -182,10 +189,11 @@ export default function GradesPage() {
                 // currentClassが存在しない場合やgradeが取得できない場合のデフォルト値を設定
                 const grade = currentClass?.grade ?? 1; // デフォルトを1に設定
 
-                const [rawRes, commentRes, gradeSummaryRes] = await Promise.all([
+                const [rawRes, commentRes, gradeSummaryRes, surveySummaryRes] = await Promise.all([
                     fetch(`${apiBaseUrl}/grades/raw_data?lesson_id=${selectedLessonId}`),
                     fetch(`${apiBaseUrl}/grades/comments?lesson_id=${selectedLessonId}`),
-                    fetch(`${apiBaseUrl}/grades/grade_summary?academic_year=${academic_year}&grade=${grade}`) // gradeを渡す
+                    fetch(`${apiBaseUrl}/grades/grade_summary?academic_year=${academic_year}&grade=${grade}`), // gradeを渡す
+                    fetch(`${apiBaseUrl}/lesson_surveys/lesson/${selectedLessonId}/summary`)
                 ]);
 
                 if (!rawRes.ok) {
@@ -213,6 +221,14 @@ export default function GradesPage() {
                     setGradeSummary([]);
                 }
 
+                if (surveySummaryRes.ok) {
+                    const surveyData = await surveySummaryRes.json();
+                    setSurveySummary(surveyData);
+                } else {
+                    console.warn("Failed to fetch survey summary:", surveySummaryRes.status);
+                    setSurveySummary(null);
+                }
+
             } catch (error) {
                 console.error("fetchGradesData error:", error);
                 setError(error instanceof Error ? error.message : String(error));
@@ -220,6 +236,7 @@ export default function GradesPage() {
                 setRawData([]);
                 setComments([]);
                 setGradeSummary([]);
+                setSurveySummary(null);
             } finally {
                 setLoading(false);
             }
@@ -506,8 +523,11 @@ export default function GradesPage() {
                      <section className="bg-white p-6 rounded-xl shadow-sm">
                          <h2 className="text-xl font-bold text-gray-800 pb-2 mb-6 border-b-2 border-gray-200">定性（アンケート）分析</h2>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                             <KeywordMap keywords={keywordAnalysis} />
-                             <CommentsList comments={comments} />
+                             <SurveySummaryChart summary={surveySummary} />
+                             <div className="space-y-8">
+                                 <KeywordMap keywords={keywordAnalysis} />
+                                 <CommentsList comments={comments} />
+                             </div>
                          </div>
                      </section>
                 </main>
@@ -699,6 +719,81 @@ const DotPlot = ({ title, times, color, avgTime, maxTime }: { title: string, tim
         </div>
     );
 };
+const SurveySummaryChart = ({ summary }: { summary: LessonSurveySummary | null }) => {
+    if (!summary || (Object.keys(summary.understanding_level_distribution).length === 0 && Object.keys(summary.difficulty_point_distribution).length === 0)) {
+        return (
+            <div>
+                <h3 className="font-semibold text-gray-700 mb-3 text-center text-sm">アンケート結果</h3>
+                <div className="flex items-center justify-center p-4 border bg-gray-50 rounded-lg min-h-[180px] text-gray-500 text-xs">
+                    アンケートデータがありません。
+                </div>
+            </div>
+        );
+    }
+
+    const understandingLabels: { [key: string]: string } = {
+        '5': 'よく理解できた',
+        '4': '理解できた',
+        '3': 'どちらともいえない',
+        '2': 'あまり理解できなかった',
+        '1': '全く理解できなかった',
+    };
+
+    const difficultyLabels: { [key: string]: string } = {
+        '5': '非常に難しかった',
+        '4': '難しかった',
+        '3': '普通',
+        '2': '簡単だった',
+        '1': '非常に簡単だった',
+    };
+
+    const renderBarChart = (title: string, data: { [key: string]: number }, labels: { [key: string]: string }) => {
+        const total = Object.values(data).reduce((acc, value) => acc + value, 0);
+        if (total === 0) {
+            return (
+                <div>
+                    <h4 className="font-semibold text-gray-600 mb-2 text-center text-xs">{title}</h4>
+                    <div className="flex items-center justify-center p-4 border bg-gray-50 rounded-lg min-h-[120px] text-gray-500 text-xs">
+                        データがありません。
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div>
+                <h4 className="font-semibold text-gray-600 mb-2 text-center text-xs">{title}</h4>
+                <div className="space-y-1 text-xs">
+                    {Object.entries(labels)
+                        .sort(([keyA], [keyB]) => parseInt(keyB) - parseInt(keyA))
+                        .map(([key, label]) => {
+                        const value = data[key] || 0;
+                        const percentage = total > 0 ? (value / total) * 100 : 0;
+                        return (
+                            <div key={key} className="flex items-center gap-2">
+                                <span className="w-32 text-right text-gray-700">{label}</span>
+                                <div className="flex-grow bg-gray-100 rounded-full h-4 relative overflow-hidden">
+                                    <div className="bg-sky-400 h-full rounded-full absolute top-0 left-0" style={{ width: `${percentage}%` }}></div>
+                                    <span className="absolute top-0 left-1/2 transform -translate-x-1/2 text-[10px] leading-4 text-white font-bold">
+                                        {Math.round(percentage)}% ({value})
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <div className="space-y-6">
+            {renderBarChart('授業の理解度', summary.understanding_level_distribution, understandingLabels)}
+            {renderBarChart('授業の難易度', summary.difficulty_point_distribution, difficultyLabels)}
+        </div>
+    );
+};
+
 const KeywordMap = ({ keywords }: { keywords: [string, number][] }) => {
     // keywordsが空、または有効なキーワードがない場合は早期リターン
     if (!keywords || keywords.length === 0 || keywords.every(([word, count]) => count <= 0)) {
