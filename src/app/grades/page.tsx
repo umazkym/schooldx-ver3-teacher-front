@@ -295,7 +295,7 @@ export default function GradesPage() {
 
                 const fullLabel = [stats.part_name, stats.chapter_name, stats.unit_name, stats.lesson_theme_name]
                     .filter(Boolean) // null や空文字列を除外
-                    .join(" - ");
+                    .join(" / ");
 
                 if (stats.total > 0) { // 回答がある問題のみ比較対象とする
                     if (rate > bestRate) {
@@ -555,7 +555,7 @@ const QuestionDetailCard = ({ label, stats, gradeAvg, questionNumber, maxTime }:
         .filter(Boolean) // null や空文字列を除外
         .map(s => s?.trim()) // 各部分の前後の空白を削除
         .filter(s => s && s.length > 0) // 空白のみの文字列も除外
-        .join(" - ");
+        .join("/");
 
 
     return (
@@ -565,7 +565,7 @@ const QuestionDetailCard = ({ label, stats, gradeAvg, questionNumber, maxTime }:
                 <div className="flex flex-wrap justify-between items-baseline gap-2" title={`元のラベル: ${label}`}>
                     <h3 className="font-bold text-base text-gray-800">
                         {fullQuestionLabel || label}
-                        {questionNumber && <span className="text-gray-500 font-normal text-sm ml-2">問{questionNumber}</span>}
+                        {questionNumber && <span className="font-bold text-base text-gray-800 ml-2">問{questionNumber}</span>}
                     </h3>
                     <div className="flex items-baseline gap-2 text-xs flex-shrink-0">
                         <span className={rateClasses[rateColor]}>クラス: {Math.round(correctRate)}%</span>

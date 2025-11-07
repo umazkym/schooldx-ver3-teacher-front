@@ -235,8 +235,7 @@ function DashboardPageContent() {
   const firstTheme = lessonInfo ? Object.values(lessonInfo.lesson_theme)[0] : undefined;
   const src = selectedContent ?? firstTheme;
   const contentInfoQuery = src
-    ? `${src.lesson_theme_name} / ${src.material_name} ${src.part_name ?? ""} ${src.chapter_name ?? ""} ${src.unit_name ??
- ""}`.trim()
+    ? `${src.material_name}/${src.part_name ?? ""}/${src.chapter_name ?? ""}/${src.unit_name ?? ""}/${src.lesson_theme_name}`.trim()
     : "";
   const timerQuery = searchParams.get("timer") || "5";
 
