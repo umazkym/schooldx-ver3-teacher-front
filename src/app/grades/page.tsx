@@ -633,7 +633,7 @@ const AnswerTimeDistribution = ({ stats, maxTime }: { stats: QuestionStats, maxT
 const DotPlot = ({ title, times, color, avgTime, maxTime }: { title: string, times: number[], color: 'green' | 'gray', avgTime: number | null, maxTime: number }) => {
     const timeCounts: { [time: number]: number } = {};
     times.forEach(t => {
-        const timeKey = Math.min(maxTime, Math.max(0, Math.round(t / 10) * 10));
+        const timeKey = Math.min(maxTime, Math.max(0, Math.round(t)));
         timeCounts[timeKey] = (timeCounts[timeKey] || 0) + 1;
     });
 
