@@ -694,11 +694,10 @@ const SurveySummaryChart = ({ summary }: { summary: LessonSurveySummary | null }
     };
 
     const difficultyLabels: { [key: string]: string } = {
-        '4': 'その他',
-        '3': '計算間違え',
-        '2': '解き方',
-        '1': '問題文',
-        '0': 'なし',
+        '3': 'その他',
+        '2': '考え方',
+        '1': '公式や定理',
+        '0': '問題文',
     };
 
     const renderBarChart = (title: string, data: { [key: string]: number }, labels: { [key: string]: string }) => {
