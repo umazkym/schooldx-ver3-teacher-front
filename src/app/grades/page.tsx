@@ -687,19 +687,18 @@ const SurveySummaryChart = ({ summary }: { summary: LessonSurveySummary | null }
     }
 
     const understandingLabels: { [key: string]: string } = {
-        '5': 'よく理解できた',
-        '4': '理解できた',
-        '3': 'どちらともいえない',
-        '2': 'あまり理解できなかった',
-        '1': '全く理解できなかった',
+        '3': '理解できた',
+        '2': 'やや理解できた',
+        '1': 'あまりわからなかった',
+        '0': '全くわからなかった',
     };
 
     const difficultyLabels: { [key: string]: string } = {
-        '5': '非常に難しかった',
-        '4': '難しかった',
-        '3': '普通',
-        '2': '簡単だった',
-        '1': '非常に簡単だった',
+        '4': 'その他',
+        '3': '計算間違え',
+        '2': '解き方',
+        '1': '問題文',
+        '0': 'なし',
     };
 
     const renderBarChart = (title: string, data: { [key: string]: number }, labels: { [key: string]: string }) => {
@@ -746,7 +745,7 @@ const SurveySummaryChart = ({ summary }: { summary: LessonSurveySummary | null }
     return (
         <div className="space-y-6">
             {renderBarChart('問題の理解度', summary.understanding_level_distribution, understandingLabels)}
-            {renderBarChart('問題の難易度', summary.difficulty_point_distribution, difficultyLabels)}
+            {renderBarChart('つまづいたポイント', summary.difficulty_point_distribution, difficultyLabels)}
         </div>
     );
 };
