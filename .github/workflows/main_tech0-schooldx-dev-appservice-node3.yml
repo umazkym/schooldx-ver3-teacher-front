@@ -29,7 +29,7 @@ jobs:
       # ▼▼▼ ここを確認 ▼▼▼
       - name: npm install and build
         env:
-          NEXT_PUBLIC_API_BASE_URL: https://tech0-schooldx-dev-appservice-python3-hbbbczata7epcaa8.eastus-01.azurewebsites.net
+          NEXT_PUBLIC_API_BASE_URL: https://tech0-schooldx-dev-appservice-python4-dwcecehve7h7cxhq.eastus-01.azurewebsites.net
         run: |
           npm install
           rm -rf .next
@@ -91,4 +91,5 @@ jobs:
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_NODE3 }}
           # リトライ設定を追加
           retry-on-error: true
+
           retry-delay-seconds: 30
