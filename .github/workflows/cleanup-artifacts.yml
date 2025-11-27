@@ -13,7 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Delete old artifacts
-        uses: actions/delete-artifact@v5
+        uses: kolpav/purge-artifacts-action@v1
         with:
-          # 作成から7日以上経過したアーティファクトを削除します
-          expired-in-days: 7
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Delete artifacts older than 7 days
+          expire-in: '7 days'
