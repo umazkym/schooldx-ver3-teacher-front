@@ -114,7 +114,7 @@ function DashboardPageContent() {
     try {
       const s = sessionStorage.getItem("selectedContentInfo");
       if (s) setSelectedContent(JSON.parse(s));
-    } catch {}
+    } catch { }
   }, []);
   useEffect(() => {
     if (!lessonId || !apiBaseUrl) return;
@@ -126,9 +126,9 @@ function DashboardPageContent() {
         if (!res.ok) return;
         const d = (await res.json()) as LessonInformation;
         setLessonInfo(d);
-      } catch {}
+      } catch { }
     })();
-  
+
   }, [lessonId]);
 
   // 修正2: 生徒データを保持する State と、動的マップ用の State/Ref を定義
@@ -176,23 +176,23 @@ function DashboardPageContent() {
           `${apiBaseUrl}/classes/${lessonInfo.class_id}/students`
         );
         if (!res.ok) {
-            // クラスに生徒がいない場合、APIは空リスト[]を返す（classes.py L.43 参照）
-            // もし404や他のエラーが返った場合
-            if (res.status === 404) {
-              console.warn(`生徒データが見つかりません (class_id: ${lessonInfo.class_id})`);
-              setStudents([]); // 空のリストをセット
-              return;
-            }
-            throw new Error(`Failed to fetch student list (Status: ${res.status})`);
+          // クラスに生徒がいない場合、APIは空リスト[]を返す（classes.py L.43 参照）
+          // もし404や他のエラーが返った場合
+          if (res.status === 404) {
+            console.warn(`生徒データが見つかりません (class_id: ${lessonInfo.class_id})`);
+            setStudents([]); // 空のリストをセット
+            return;
+          }
+          throw new Error(`Failed to fetch student list (Status: ${res.status})`);
         }
-        
+
         // ★修正★ /classes/{class_id}/students のレスポンス型 (StudentInfo[])
         // schemas.py L.226 StudentInfo (student_id, name, class_id, students_number)
-        const data: { 
-          student_id: number; 
-          name: string; 
-          class_id: number; 
-          students_number: number; 
+        const data: {
+          student_id: number;
+          name: string;
+          class_id: number;
+          students_number: number;
         }[] = await res.json();
 
         // 取得した生徒データで students state を初期化
@@ -297,7 +297,7 @@ function DashboardPageContent() {
     }
 
     try {
-      const res = await fetch(`${apiBaseUrl}/api/lesson_themes/${themeId}/start_exercise`, {
+      const res = await fetch(`${apiBaseUrl}/api/lesson_themes/${lessonId}/${themeId}/start_exercise`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -338,7 +338,7 @@ function DashboardPageContent() {
 
     try {
       // 要件⑤: バックエンドAPIを呼び出す
-      const res = await fetch(`${apiBaseUrl}/api/lesson_themes/${themeId}/end_exercise`, {
+      const res = await fetch(`${apiBaseUrl}/api/lesson_themes/${lessonId}/${themeId}/end_exercise`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -381,7 +381,7 @@ function DashboardPageContent() {
         // マイナス（未来）の場合、またはプラスで大きすぎる場合
         if (rawDiff < -3600 || (rawDiff < 0 && Math.abs(rawDiff) > 60)) {
           const estimatedOffset = (d.answer_start_unix - clientNowUnix) * 1000; // ミリ秒に変換
-          console.log(`🕐 Detected time offset: ${(estimatedOffset/1000/60).toFixed(1)} minutes (${(estimatedOffset/1000).toFixed(0)}s). Adjusting client time.`);
+          console.log(`🕐 Detected time offset: ${(estimatedOffset / 1000 / 60).toFixed(1)} minutes (${(estimatedOffset / 1000).toFixed(0)}s). Adjusting client time.`);
           setTimeOffset(estimatedOffset);
           timeOffsetRef.current = estimatedOffset;
         }
@@ -488,8 +488,8 @@ function DashboardPageContent() {
       const res = await fetch(url);
       if (!res.ok) {
         if (res.status === 404) {
-            console.log("回答データがまだありません (404)");
-            allAnswersData = []; // データがなければ空配列
+          console.log("回答データがまだありません (404)");
+          allAnswersData = []; // データがなければ空配列
         } else {
           console.error(`Error fetching all answers data: ${res.status}`);
           return; // エラー時は更新しない
@@ -511,40 +511,40 @@ function DashboardPageContent() {
     // (B) マッピングの決定
     let currentMap = dynamicQuestionMapRef.current;
     if (!currentMap) {
-        // マップがまだない場合、取得したデータから動的に生成する
-        const questionIds = new Set<number>();
-        // ★修正★ allAnswersData を直接イテレート
-        allAnswersData.forEach(answer => {
-            questionIds.add(answer.question.lesson_question_id);
-        });
+      // マップがまだない場合、取得したデータから動的に生成する
+      const questionIds = new Set<number>();
+      // ★修正★ allAnswersData を直接イテレート
+      allAnswersData.forEach(answer => {
+        questionIds.add(answer.question.lesson_question_id);
+      });
 
-        // 取得した問題IDをソートし、q1, q2, q3, q4 に割り当てる
-        const sortedQuestionIds = Array.from(questionIds).sort((a, b) => a - b);
-        
-        const newMap: {
-          [id: number]: {
-            status: StudentStringKey,
-            progress: StudentNumberKey,
-            startUnix: keyof Pick<Student, 'q1StartUnix' | 'q2StartUnix' | 'q3StartUnix' | 'q4StartUnix'>
-          }
-        } = {};
-        const keys: {
+      // 取得した問題IDをソートし、q1, q2, q3, q4 に割り当てる
+      const sortedQuestionIds = Array.from(questionIds).sort((a, b) => a - b);
+
+      const newMap: {
+        [id: number]: {
           status: StudentStringKey,
           progress: StudentNumberKey,
           startUnix: keyof Pick<Student, 'q1StartUnix' | 'q2StartUnix' | 'q3StartUnix' | 'q4StartUnix'>
-        }[] = [
-            { status: 'q1', progress: 'q1Progress', startUnix: 'q1StartUnix' },
-            { status: 'q2', progress: 'q2Progress', startUnix: 'q2StartUnix' },
-            { status: 'q3', progress: 'q3Progress', startUnix: 'q3StartUnix' },
-            { status: 'q4', progress: 'q4Progress', startUnix: 'q4StartUnix' },
+        }
+      } = {};
+      const keys: {
+        status: StudentStringKey,
+        progress: StudentNumberKey,
+        startUnix: keyof Pick<Student, 'q1StartUnix' | 'q2StartUnix' | 'q3StartUnix' | 'q4StartUnix'>
+      }[] = [
+          { status: 'q1', progress: 'q1Progress', startUnix: 'q1StartUnix' },
+          { status: 'q2', progress: 'q2Progress', startUnix: 'q2StartUnix' },
+          { status: 'q3', progress: 'q3Progress', startUnix: 'q3StartUnix' },
+          { status: 'q4', progress: 'q4Progress', startUnix: 'q4StartUnix' },
         ];
-        sortedQuestionIds.slice(0, 4).forEach((qId, index) => {
-            newMap[qId] = keys[index];
-        });
-        console.log("動的マッピングを生成:", newMap);
-        setDynamicQuestionMap(newMap); // Stateを更新
-        currentMap = newMap; 
-        // この実行サイクルでは更新された Ref の代わりにローカル変数を使う
+      sortedQuestionIds.slice(0, 4).forEach((qId, index) => {
+        newMap[qId] = keys[index];
+      });
+      console.log("動的マッピングを生成:", newMap);
+      setDynamicQuestionMap(newMap); // Stateを更新
+      currentMap = newMap;
+      // この実行サイクルでは更新された Ref の代わりにローカル変数を使う
     }
 
     // (C) 画面更新 (全生徒データをマッピング)
@@ -561,7 +561,7 @@ function DashboardPageContent() {
       // prevStudents (生徒の枠) を元に更新
       return prevStudents.map(student => {
         const answers = answersByStudent.get(student.id);
-        
+
         // この生徒の回答データがない場合は、既存のstudentをそのまま返す
         if (!answers || answers.length === 0) {
           return student;
@@ -574,38 +574,38 @@ function DashboardPageContent() {
           const keys = currentMap ? currentMap[answer.question.lesson_question_id] : undefined;
 
           if (keys) {
-              const statusKey = keys.status;
-              const progressKey = keys.progress;
-              const startUnixKey = keys.startUnix;
+            const statusKey = keys.status;
+            const progressKey = keys.progress;
+            const startUnixKey = keys.startUnix;
 
-              const newProgress = calcProgress(answer);
-              // const currentProgress = student[progressKey];
+            const newProgress = calcProgress(answer);
+            // const currentProgress = student[progressKey];
 
-              // プログレスバーを常に更新（pencil状態でも確実に更新されるように）
-              studentUpdate[progressKey] = newProgress;
+            // プログレスバーを常に更新（pencil状態でも確実に更新されるように）
+            studentUpdate[progressKey] = newProgress;
 
-              // statusの更新: 一度「正解」または「不正解」になった問題は、statusを変更しない
-              const currentStatus = student[statusKey];
-              const newStatus = calcIcon(answer);
+            // statusの更新: 一度「正解」または「不正解」になった問題は、statusを変更しない
+            const currentStatus = student[statusKey];
+            const newStatus = calcIcon(answer);
 
-              // answer_start_unixを保存（リアルタイム進捗バー更新に使用）
-              const startUnixValue = getStartUnix(answer);
-              (studentUpdate as Record<string, number | null>)[startUnixKey] = startUnixValue;
+            // answer_start_unixを保存（リアルタイム進捗バー更新に使用）
+            const startUnixValue = getStartUnix(answer);
+            (studentUpdate as Record<string, number | null>)[startUnixKey] = startUnixValue;
 
-              // デバッグ: startUnixの保存状況を確認
-              if (startUnixValue) {
-                // console.log(`Student ${student.id} - ${statusKey}: startUnix set to ${startUnixValue}, status: ${newStatus}`);
-              } else {
-                // console.warn(`Student ${student.id} - ${statusKey}: startUnix is null!`, {
-                //   answer_start_unix: answer.answer_start_unix,
-                //   answer_start_timestamp: answer.answer_start_timestamp
-                // });
-              }
+            // デバッグ: startUnixの保存状況を確認
+            if (startUnixValue) {
+              // console.log(`Student ${student.id} - ${statusKey}: startUnix set to ${startUnixValue}, status: ${newStatus}`);
+            } else {
+              // console.warn(`Student ${student.id} - ${statusKey}: startUnix is null!`, {
+              //   answer_start_unix: answer.answer_start_unix,
+              //   answer_start_timestamp: answer.answer_start_timestamp
+              // });
+            }
 
-              // 現在のstatusが「correct」または「wrong」の場合は、新しいstatusに上書きしない
-              if (currentStatus !== 'correct' && currentStatus !== 'wrong') {
-                studentUpdate[statusKey] = newStatus;
-              }
+            // 現在のstatusが「correct」または「wrong」の場合は、新しいstatusに上書きしない
+            if (currentStatus !== 'correct' && currentStatus !== 'wrong') {
+              studentUpdate[statusKey] = newStatus;
+            }
           }
         });
         // 既存の student データと更新データをマージ
@@ -742,11 +742,11 @@ function DashboardPageContent() {
               progress: StudentNumberKey,
               startUnix: keyof Pick<Student, 'q1StartUnix' | 'q2StartUnix' | 'q3StartUnix' | 'q4StartUnix'>
             }> = [
-              { status: 'q1', progress: 'q1Progress', startUnix: 'q1StartUnix' },
-              { status: 'q2', progress: 'q2Progress', startUnix: 'q2StartUnix' },
-              { status: 'q3', progress: 'q3Progress', startUnix: 'q3StartUnix' },
-              { status: 'q4', progress: 'q4Progress', startUnix: 'q4StartUnix' },
-            ];
+                { status: 'q1', progress: 'q1Progress', startUnix: 'q1StartUnix' },
+                { status: 'q2', progress: 'q2Progress', startUnix: 'q2StartUnix' },
+                { status: 'q3', progress: 'q3Progress', startUnix: 'q3StartUnix' },
+                { status: 'q4', progress: 'q4Progress', startUnix: 'q4StartUnix' },
+              ];
 
             fixedKeys.forEach(keyInfo => {
               const statusKey = keyInfo.status;
@@ -880,13 +880,13 @@ function DashboardPageContent() {
             style={{ width: `${clamped}%` }}
           />
         )}
-        
+
         {/* 中央にパーセンテージ表示 */}
         <div className="absolute w-full h-full flex items-center justify-center text-xs text-white font-bold">
           {Math.round(clamped)}%
         </div>
       </div>
-     );
+    );
   }
 
 
@@ -911,7 +911,7 @@ function DashboardPageContent() {
       {/* 授業情報とタイマー */}
       <div className="text-gray-600 mb-2 flex justify-between items-start">
         <div>
-            <div>{dateInfoQuery}</div>
+          <div>{dateInfoQuery}</div>
           <div>{contentInfoQuery}</div>
         </div>
         {/* タイマー表示 */}
@@ -928,18 +928,18 @@ function DashboardPageContent() {
       <div className="flex items-center mb-2 gap-2 justify-end">
         <button
           className={`bg-blue-500 text-white px-3 py-1 rounded ${!isLessonStarted ||
- isRunning ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
+            isRunning ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
           onClick={startTimer}
           disabled={!isLessonStarted ||
- isRunning}
+            isRunning}
         >
           演習開始
         </button>
         <button
           className={`bg-blue-500 text-white px-3 py-1 rounded ${!isRunning ?
- 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
-           onClick={stopTimer}
-           disabled={!isRunning}
+            'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
+          onClick={stopTimer}
+          disabled={!isRunning}
         >
           演習終了
         </button>
@@ -949,7 +949,7 @@ function DashboardPageContent() {
       </div>
 
       {/* 生徒一覧テーブル */}
-        <div className="overflow-x-auto">
+      <div className="overflow-x-auto">
         <table className="border border-[#979191] text-sm min-w-max w-full">
           {/* テーブルヘッダー */}
           <thead className="bg-white">
@@ -976,13 +976,13 @@ function DashboardPageContent() {
               </td>
               <td className="p-1 border border-[#979191]">
                 <ProgressBarBar
-                   color="green"
+                  color="green"
                   bg="red"
                   percentage={calcQAPercentage(students, "q2")}
                 />
               </td>
               <td className="p-1 border border-[#979191]">
-                 <ProgressBarBar
+                <ProgressBarBar
                   color="green"
                   bg="red"
                   percentage={calcQAPercentage(students, "q3")}
@@ -1010,7 +1010,7 @@ function DashboardPageContent() {
                   <CellWithBar icon={st.q1} progress={st.q1Progress} />
                 </td>
                 <td className={bgColorQA(st.q2)}>
-                   <CellWithBar icon={st.q2} progress={st.q2Progress} />
+                  <CellWithBar icon={st.q2} progress={st.q2Progress} />
                 </td>
                 <td className={bgColorQA(st.q3)}>
                   <CellWithBar
@@ -1028,7 +1028,7 @@ function DashboardPageContent() {
             ))}
           </tbody>
         </table>
-       </div>
+      </div>
     </div>
   );
 }
