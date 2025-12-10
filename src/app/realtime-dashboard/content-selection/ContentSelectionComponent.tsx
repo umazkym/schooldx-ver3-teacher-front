@@ -10,7 +10,7 @@ export default function ContentSelectionComponent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const lessonIdStr = searchParams.get("lesson_id");
-  const lessonId   = lessonIdStr ? Number(lessonIdStr) : null;
+  const lessonId = lessonIdStr ? Number(lessonIdStr) : null;
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -34,7 +34,7 @@ export default function ContentSelectionComponent() {
     timetable_id: number;
     lesson_name: string | null;
     delivery_status: boolean;
-    lesson_status: boolean;
+    lesson_status: number;  // 1=READY, 2=ACTIVE, 3=END
     date: string;
     day_of_week: string;
     period: number;
@@ -54,8 +54,8 @@ export default function ContentSelectionComponent() {
   };
 
   const [lessonInfo, setLessonInfo] = useState<LessonApiResponse | null>(null);
-  const [contents,   setContents]   = useState<ContentRow[]>([]);
-  const [loading,    setLoading]    = useState(false);
+  const [contents, setContents] = useState<ContentRow[]>([]);
+  const [loading, setLoading] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isLessonStarted, setIsLessonStarted] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
@@ -88,29 +88,30 @@ export default function ContentSelectionComponent() {
     setLoading(true);
     (async () => {
       try {
-        const res  = await fetch(
+        const res = await fetch(
           `${apiBaseUrl}/lesson_attendance/lesson_information?lesson_id=${lessonId}`
         );
         if (!res.ok) throw new Error(`GET lesson_information failed: ${res.status}`);
         const data = (await res.json()) as LessonApiResponse;
         setLessonInfo(data);
-        
+
         // ▼▼▼▼▼ 修正点 ▼▼▼▼▼
         // APIから取得した授業ステータスをUIに反映する
-        setIsLessonStarted(data.lesson_status);
+        // lesson_status: 1=READY, 2=ACTIVE, 3=END
+        setIsLessonStarted(data.lesson_status === 2 || data.lesson_status === 3);
         // ▲▲▲▲▲ 修正点 ▲▲▲▲▲
 
         const themes = data.lesson_theme || [];
         setContents(
           themes.map((t, idx): ContentRow => ({
-            id:       t.lesson_theme_id,
-            no:       `No.${idx + 1}`,
+            id: t.lesson_theme_id,
+            no: `No.${idx + 1}`,
             textbook: t.material_name,
-            hen:      t.part_name     ?? "",
-            chapter:  t.chapter_name  ?? "",
-            unit:     t.unit_name     ?? "",
-            theme:    t.lesson_theme_name,
-            time:     "5",
+            hen: t.part_name ?? "",
+            chapter: t.chapter_name ?? "",
+            unit: t.unit_name ?? "",
+            theme: t.lesson_theme_name,
+            time: "5",
           }))
         );
       } catch (err) {
@@ -213,34 +214,34 @@ export default function ContentSelectionComponent() {
     sessionStorage.setItem(
       "selectedContentInfo",
       JSON.stringify({
-        lesson_theme_id:   c.id,
+        lesson_theme_id: c.id,
         lesson_theme_name: c.theme,
-        material_name:     c.textbook,
-        part_name:         c.hen,
-        chapter_name:      c.chapter,
-        unit_name:         c.unit,
+        material_name: c.textbook,
+        part_name: c.hen,
+        chapter_name: c.chapter,
+        unit_name: c.unit,
       })
     );
     if (lessonInfo) {
       sessionStorage.setItem(
         "selectedLessonMeta",
         JSON.stringify({
-          date:        lessonInfo.date,
+          date: lessonInfo.date,
           day_of_week: lessonInfo.day_of_week,
-          period:      lessonInfo.period,
+          period: lessonInfo.period,
           lesson_name: lessonInfo.lesson_name,
         })
       );
     }
-    
+
     const q = new URLSearchParams({
-      timer:     c.time,
+      timer: c.time,
       lesson_id: lessonIdStr ?? "",
     });
     router.push(`/realtime-dashboard/dashboard?${q.toString()}`);
   };
 
-  if (!lessonId)          return <p>lesson_id がありません。</p>;
+  if (!lessonId) return <p>lesson_id がありません。</p>;
   if (loading || !lessonInfo) return <p>Loading...</p>;
 
   const dateInfoQuery =
@@ -268,18 +269,16 @@ export default function ContentSelectionComponent() {
 
       <div className="flex justify-end gap-2 mb-4">
         <button
-          className={`bg-blue-500 text-white px-3 py-1 rounded ${
-            isStarting || isLessonStarted ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'
-          }`}
+          className={`bg-blue-500 text-white px-3 py-1 rounded ${isStarting || isLessonStarted ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'
+            }`}
           onClick={handleStartLesson}
           disabled={isStarting || isLessonStarted}
         >
           {isStarting ? "開始処理中..." : (isLessonStarted ? "授業開始済み" : "授業開始")}
         </button>
-        <button 
-          className={`bg-gray-500 text-white px-3 py-1 rounded ${
-            isEnding || !isLessonStarted ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
-          }`}
+        <button
+          className={`bg-gray-500 text-white px-3 py-1 rounded ${isEnding || !isLessonStarted ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
+            }`}
           onClick={handleEndLesson}
           disabled={isEnding || !isLessonStarted}
         >
