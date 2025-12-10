@@ -856,6 +856,112 @@ function DashboardPageContent() {
     return "p-2 border border-[#979191] bg-white";
   }
 
+  // 高視認性の解答状況セル（教室後方からも見やすい）
+  function AnswerStatusCell({ label, status }: { label: string; status: string }) {
+    // 正解: 鮮やかな緑 + チェックマーク
+    if (status === "correct") {
+      return (
+        <div className="flex flex-col items-center justify-center rounded-md bg-emerald-500 text-white h-full min-h-[50px]">
+          <span className="text-xs font-medium opacity-80">Q{label}</span>
+          <span className="text-2xl font-bold">✓</span>
+        </div>
+      );
+    }
+    // 不正解: 鮮やかな赤 + バツマーク
+    if (status === "wrong") {
+      return (
+        <div className="flex flex-col items-center justify-center rounded-md bg-red-500 text-white h-full min-h-[50px]">
+          <span className="text-xs font-medium opacity-80">Q{label}</span>
+          <span className="text-2xl font-bold">✗</span>
+        </div>
+      );
+    }
+    // 解答中: 黄色 + 鉛筆アイコン
+    if (status === "pencil") {
+      return (
+        <div className="flex flex-col items-center justify-center rounded-md bg-amber-400 text-white h-full min-h-[50px] animate-pulse">
+          <span className="text-xs font-medium opacity-80">Q{label}</span>
+          <span className="text-xl">✏️</span>
+        </div>
+      );
+    }
+    // 未回答: グレー
+    return (
+      <div className="flex flex-col items-center justify-center rounded-md bg-gray-200 text-gray-500 h-full min-h-[50px]">
+        <span className="text-xs font-medium opacity-60">Q{label}</span>
+        <span className="text-xl">─</span>
+      </div>
+    );
+  }
+
+  // コンパクトなステータスバッジ（人数が多い時用）
+  function StatusBadge({ status }: { status: string }) {
+    if (status === "correct") {
+      return (
+        <div className="flex items-center justify-center rounded bg-[#C6EFD0] text-[#22C55E] h-6 text-sm font-bold">
+          ✓
+        </div>
+      );
+    }
+    if (status === "wrong") {
+      return (
+        <div className="flex items-center justify-center rounded bg-[#FFD0D0] text-[#EF4444] h-6 text-sm font-bold">
+          ✗
+        </div>
+      );
+    }
+    if (status === "pencil") {
+      return (
+        <div className="flex items-center justify-center rounded bg-amber-100 text-amber-600 h-6 text-xs animate-pulse">
+          ✏
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center justify-center rounded bg-gray-100 text-gray-400 h-6 text-xs">
+        ─
+      </div>
+    );
+  }
+
+  // 大きな正誤表示セル（後方からも見やすい）
+  function LargeStatusCell({ label, status }: { label: string; status: string }) {
+    // 正解: 緑背景 + 大きなチェック
+    if (status === "correct") {
+      return (
+        <div className="flex flex-col items-center justify-center rounded-lg bg-[#22C55E] text-white py-2">
+          <span className="text-[10px] font-medium opacity-90">Q{label}</span>
+          <span className="text-xl font-bold leading-none">✓</span>
+        </div>
+      );
+    }
+    // 不正解: 赤背景 + 大きなバツ
+    if (status === "wrong") {
+      return (
+        <div className="flex flex-col items-center justify-center rounded-lg bg-[#EF4444] text-white py-2">
+          <span className="text-[10px] font-medium opacity-90">Q{label}</span>
+          <span className="text-xl font-bold leading-none">✗</span>
+        </div>
+      );
+    }
+    // 解答中: オレンジ背景 + 鉛筆（点滅）
+    if (status === "pencil") {
+      return (
+        <div className="flex flex-col items-center justify-center rounded-lg bg-[#F59E0B] text-white py-2 animate-pulse">
+          <span className="text-[10px] font-medium opacity-90">Q{label}</span>
+          <span className="text-lg leading-none">✏️</span>
+        </div>
+      );
+    }
+    // 未回答: グレー背景
+    return (
+      <div className="flex flex-col items-center justify-center rounded-lg bg-gray-200 text-gray-400 py-2">
+        <span className="text-[10px] font-medium opacity-60">Q{label}</span>
+        <span className="text-lg leading-none">─</span>
+      </div>
+    );
+  }
+
 
   function ProgressBarBar({
     color,
@@ -908,131 +1014,112 @@ function DashboardPageContent() {
           </button>
           <span className="text-xl font-bold">ダッシュボード</span>
         </div>
-        <div className="border border-blue-100 bg-blue-50 p-2 rounded mb-4 min-w-[700px] text-center">
+        <div className="border border-blue-100 bg-blue-50 p-2 rounded min-w-[500px] text-center">
           {message}
         </div>
       </div>
 
       {/* 授業情報とタイマー */}
-      <div className="text-gray-600 mb-2 flex justify-between items-start">
-        <div>
-          <div>{dateInfoQuery}</div>
-          <div>{contentInfoQuery}</div>
+      <div className="mb-3 flex justify-between items-center">
+        <div className="text-gray-600">
+          <div className="text-lg font-medium">{dateInfoQuery}</div>
+          <div className="text-sm">{contentInfoQuery}</div>
         </div>
-        {/* タイマー表示 */}
-        <div
-          className="m-4 w-24 h-24 border-4 border-blue-600 rounded-full flex items-center justify-center text-blue-600 text-lg font-bold cursor-pointer hover:opacity-80"
-          title="クリックして時間を変更"
-          onClick={handleChangeTimer}
-        >
-          {timeStr}
+        {/* タイマーと操作 - 大きく強調 */}
+        <div className="flex items-center gap-4">
+          <div
+            className={`w-24 h-24 border-4 rounded-full flex items-center justify-center text-3xl font-black cursor-pointer transition-all ${isRunning
+                ? 'border-[#F59E0B] text-[#F59E0B] bg-amber-50 animate-pulse'
+                : 'border-[#285AC8] text-[#285AC8] hover:bg-blue-50'
+              }`}
+            title="クリックして時間を変更"
+            onClick={handleChangeTimer}
+          >
+            {timeStr}
+          </div>
+          <div className="flex flex-col gap-2">
+            <button
+              className={`px-6 py-3 rounded-lg text-lg font-bold text-white transition-all ${!isLessonStarted || isRunning
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-[#285AC8] hover:bg-blue-700 shadow-md hover:shadow-lg'}`}
+              onClick={startTimer}
+              disabled={!isLessonStarted || isRunning}
+            >
+              演習開始
+            </button>
+            <button
+              className={`px-6 py-3 rounded-lg text-lg font-bold text-white transition-all ${!isRunning
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-red-500 hover:bg-red-600 shadow-md hover:shadow-lg'}`}
+              onClick={stopTimer}
+              disabled={!isRunning}
+            >
+              演習終了
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* 操作ボタン */}
-      <div className="flex items-center mb-2 gap-2 justify-end">
-        <button
-          className={`bg-blue-500 text-white px-3 py-1 rounded ${!isLessonStarted ||
-            isRunning ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
-          onClick={startTimer}
-          disabled={!isLessonStarted ||
-            isRunning}
-        >
-          演習開始
-        </button>
-        <button
-          className={`bg-blue-500 text-white px-3 py-1 rounded ${!isRunning ?
-            'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
-          onClick={stopTimer}
-          disabled={!isRunning}
-        >
-          演習終了
-        </button>
-        <button className="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600">
-          授業コンテンツ切り替え
-        </button>
+      {/* 正答率サマリーバー */}
+      <div className="flex items-center justify-between mb-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+        <span className="font-bold text-gray-700">正答率</span>
+        <div className="flex gap-4">
+          {[
+            { label: '問題1', key: 'q1' as const },
+            { label: '問題2', key: 'q2' as const },
+            { label: '問題3', key: 'q3' as const },
+            { label: '問題4', key: 'q4' as const },
+          ].map(({ label, key }) => {
+            const pct = Math.round(calcQAPercentage(students, key));
+            return (
+              <div key={key} className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">{label}:</span>
+                <div className="w-24 h-4 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#4CB64B] transition-all duration-300"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <span className={`font-bold min-w-[40px] text-right ${pct >= 70 ? 'text-green-600' : pct >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
+                  {pct}%
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <span className="text-sm text-gray-500">回答者: {students.filter(s => s.q1 === 'correct' || s.q1 === 'wrong' || s.q1 === 'pencil').length} / {students.length}名</span>
       </div>
-
-      {/* 生徒一覧テーブル */}
-      <div className="overflow-x-auto">
-        <table className="border border-[#979191] text-sm min-w-max w-full">
-          {/* テーブルヘッダー */}
-          <thead className="bg-white">
-            <tr>
-              {/* ▼▼▼ 出席番号のカラムヘッダー ▼▼▼ */}
-              <th className="p-2 border border-[#979191]">出席番号</th>
-              {/* ▲▲▲ 変更ここまで ▲▲▲ */}
-              <th className="p-2 border border-[#979191]">名前</th>
-              <th className="p-2 border border-[#979191]">問題1</th>
-              <th className="p-2 border border-[#979191]">問題2</th>
-              <th className="p-2 border border-[#979191]">問題3</th>
-              <th className="p-2 border border-[#979191]">問題4</th>
-            </tr>
-            {/* 正答率バー表示行 */}
-            <tr className="bg-white text-xs">
-              <td className="p-1 border border-[#979191] text-center"></td> {/* 出席番号列は空 */}
-              <td className="p-1 border border-[#979191] text-center"></td> {/* 名前列は空 */}
-              <td className="p-1 border border-[#979191]">
-                <ProgressBarBar
-                  color="green"
-                  bg="red"
-                  percentage={calcQAPercentage(students, "q1")}
-                />
-              </td>
-              <td className="p-1 border border-[#979191]">
-                <ProgressBarBar
-                  color="green"
-                  bg="red"
-                  percentage={calcQAPercentage(students, "q2")}
-                />
-              </td>
-              <td className="p-1 border border-[#979191]">
-                <ProgressBarBar
-                  color="green"
-                  bg="red"
-                  percentage={calcQAPercentage(students, "q3")}
-                />
-              </td>
-              <td className="p-1 border border-[#979191]">
-                <ProgressBarBar
-                  color="green"
-                  bg="red"
-                  percentage={calcQAPercentage(students, "q4")}
-                />
-              </td>
-            </tr>
-          </thead>
-          {/* テーブルボディ */}
-          <tbody>
-            {students.map((st) => (
-              <tr key={st.id} className="text-center">
-                {/* ▼▼▼ 出席番号を表示するセルを追加 ▼▼▼ */}
-                <td className="p-2 border border-[#979191]">{st.students_number}</td>
-                {/* ▲▲▲ 変更ここまで ▲▲▲ */}
-                <td className="p-2 border border-[#979191]">{st.name}</td>
-                {/* 各問題の解答状況セル */}
-                <td className={bgColorQA(st.q1)}>
-                  <CellWithBar icon={st.q1} progress={st.q1Progress} />
-                </td>
-                <td className={bgColorQA(st.q2)}>
-                  <CellWithBar icon={st.q2} progress={st.q2Progress} />
-                </td>
-                <td className={bgColorQA(st.q3)}>
-                  <CellWithBar
-                    icon={st.q3}
-                    progress={st.q3Progress}
-                  />
-                </td>
-                <td className={bgColorQA(st.q4)}>
-                  <CellWithBar
-                    icon={st.q4}
-                    progress={st.q4Progress}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* 生徒一覧 - 横配置で視認性向上 */}
+      <div
+        className="grid gap-3"
+        style={{
+          gridTemplateColumns: `repeat(${students.length <= 8 ? 4 :
+            students.length <= 15 ? 5 :
+              students.length <= 24 ? 6 :
+                students.length <= 35 ? 7 :
+                  8
+            }, minmax(0, 1fr))`
+        }}
+      >
+        {students.map((st) => (
+          <div
+            key={st.id}
+            className="bg-white border-2 border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow"
+          >
+            {/* 出席番号と名前 - 横配置 */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200">
+              <span className="text-2xl font-black text-[#285AC8]">{st.students_number}</span>
+              <span className="text-base font-medium text-gray-700 truncate flex-1">{st.name}</span>
+            </div>
+            {/* 問題1-4の正誤表示 - 大きく見やすく */}
+            <div className="grid grid-cols-4 gap-1 p-2">
+              <LargeStatusCell label="1" status={st.q1} />
+              <LargeStatusCell label="2" status={st.q2} />
+              <LargeStatusCell label="3" status={st.q3} />
+              <LargeStatusCell label="4" status={st.q4} />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
