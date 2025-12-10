@@ -7,19 +7,19 @@ import { apiBaseUrl } from '@/lib/apiConfig';
 
 // クラスごとの色定義
 const classColors = [
-    { td: 'bg-blue-50', button: 'bg-blue-100', text: 'text-blue-800', hover: 'hover:bg-blue-200' },
-    { td: 'bg-green-50', button: 'bg-green-100', text: 'text-green-800', hover: 'hover:bg-green-200' },
-    { td: 'bg-yellow-50', button: 'bg-yellow-100', text: 'text-yellow-800', hover: 'hover:bg-yellow-200' },
-    { td: 'bg-purple-50', button: 'bg-purple-100', text: 'text-purple-800', hover: 'hover:bg-purple-200' },
-    { td: 'bg-pink-50', button: 'bg-pink-100', text: 'text-pink-800', hover: 'hover:bg-pink-200' },
-    { td: 'bg-indigo-50', button: 'bg-indigo-100', text: 'text-indigo-800', hover: 'hover:bg-indigo-200' },
+  { td: 'bg-blue-50', button: 'bg-blue-100', text: 'text-blue-800', hover: 'hover:bg-blue-200' },
+  { td: 'bg-green-50', button: 'bg-green-100', text: 'text-green-800', hover: 'hover:bg-green-200' },
+  { td: 'bg-yellow-50', button: 'bg-yellow-100', text: 'text-yellow-800', hover: 'hover:bg-yellow-200' },
+  { td: 'bg-purple-50', button: 'bg-purple-100', text: 'text-purple-800', hover: 'hover:bg-purple-200' },
+  { td: 'bg-pink-50', button: 'bg-pink-100', text: 'text-pink-800', hover: 'hover:bg-pink-200' },
+  { td: 'bg-indigo-50', button: 'bg-indigo-100', text: 'text-indigo-800', hover: 'hover:bg-indigo-200' },
 ];
 
 const getClassColors = (classId: number | null) => {
-    if (classId === null) {
-        return { td: 'bg-[#F7F7F7]', button: '', text: '', hover: '' };
-    }
-    return classColors[classId % classColors.length];
+  if (classId === null) {
+    return { td: 'bg-[#F7F7F7]', button: '', text: '', hover: '' };
+  }
+  return classColors[classId % classColors.length];
 };
 
 export default function RealtimeDashboardCalendarPage() {
@@ -95,7 +95,7 @@ export default function RealtimeDashboardCalendarPage() {
     class_name: string | null;
     lesson_name: string | null;
     delivery_status: boolean;
-    lesson_status: boolean;
+    lesson_status: number;  // 1=READY, 2=ACTIVE, 3=END
   }
 
   useEffect(() => {
@@ -259,7 +259,7 @@ export default function RealtimeDashboardCalendarPage() {
                           </td>
                         );
                       }
-                      
+
                       const colors = getClassColors(info.classId);
                       return (
                         <td

@@ -66,16 +66,16 @@ function SettingPageContent() {
       console.error("APIのベースURLが設定されていません。");
       return;
     }
-    
+
     // ▼▼▼ 末尾にスラッシュを追加 ▼▼▼
     const fullUrl = `${apiBaseUrl}/classes/`;
     // ▲▲▲ 修正ここまで ▲▲▲
-    
+
     console.log('=== fetchClasses Debug ===');
     console.log('apiBaseUrl:', apiBaseUrl);
     console.log('fullUrl:', fullUrl);
     console.log('fullUrl protocol:', new URL(fullUrl).protocol);
-    
+
     try {
       const res = await fetch(fullUrl, { method: "GET" });
       if (!res.ok) throw new Error("クラス一覧の取得に失敗しました");
@@ -308,7 +308,7 @@ function SettingPageContent() {
           {error}
         </div>
       )}
-      
+
       <div className="flex items-center justify-between mb-4">
         <div>
           <button onClick={() => history.back()} className="font-bold hover:underline mr-4">
@@ -331,9 +331,7 @@ function SettingPageContent() {
               ))}
             </select>
           </div>
-          <button className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-            一時保存
-          </button>
+
           <button
             className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
             onClick={handleRegister}

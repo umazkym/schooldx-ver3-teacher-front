@@ -67,7 +67,7 @@ interface LessonInformation {
   day_of_week: string;
   period: number;
   lesson_name: string | null;
-  lesson_theme: Record<string, LessonThemeBlock>;
+  lesson_theme: LessonThemeBlock[];  // APIはListを返す
 }
 
 // /grades/raw_data のレスポンスアイテムの型定義
@@ -123,10 +123,15 @@ function DashboardPageContent() {
         const res = await fetch(
           `${apiBaseUrl}/lesson_attendance/lesson_information?lesson_id=${lessonId}`
         );
-        if (!res.ok) return;
+        if (!res.ok) {
+          console.error(`lesson_information API failed: ${res.status}`);
+          return;
+        }
         const d = (await res.json()) as LessonInformation;
         setLessonInfo(d);
-      } catch { }
+      } catch (err) {
+        console.error('lesson_information fetch error:', err);
+      }
     })();
 
   }, [lessonId]);
@@ -232,7 +237,7 @@ function DashboardPageContent() {
   const dateInfoQuery = srcDate
     ? `${srcDate.date} (${srcDate.day_of_week}) / ${srcDate.period}限目 ${srcDate.lesson_name ?? ""}`
     : "ロード中...";
-  const firstTheme = lessonInfo ? Object.values(lessonInfo.lesson_theme)[0] : undefined;
+  const firstTheme = lessonInfo?.lesson_theme?.[0];
   const src = selectedContent ?? firstTheme;
   const contentInfoQuery = src
     ? `${src.material_name}/${src.part_name ?? ""}/${src.chapter_name ?? ""}/${src.unit_name ?? ""}/${src.lesson_theme_name}`.trim()

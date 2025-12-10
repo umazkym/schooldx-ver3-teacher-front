@@ -15,10 +15,10 @@ const classColors = [
 ];
 
 const getClassColors = (classId: number | null) => {
-    if (classId === null) {
-        return { td: 'bg-white', button: 'hover:bg-gray-100', text: 'text-gray-400', hover: '' };
-    }
-    return classColors[classId % classColors.length];
+  if (classId === null) {
+    return { td: 'bg-white', button: 'hover:bg-gray-100', text: 'text-gray-400', hover: '' };
+  }
+  return classColors[classId % classColors.length];
 };
 
 /**
@@ -32,7 +32,7 @@ export default function ClassRegistrationPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [scheduleEntries, setScheduleEntries] = useState<LessonCalendarEntry[]>([]);
   const today = useMemo(() => new Date(), []);
-  
+
   interface LessonCalendarEntry {
     timetable_id: number
     date: string
@@ -44,15 +44,15 @@ export default function ClassRegistrationPage() {
     class_name: string | null;
     lesson_name: string | null
     delivery_status: boolean
-    lesson_status: boolean
+    lesson_status: number  // 1=READY, 2=ACTIVE, 3=END
   }
 
   useEffect(() => {
     if (!apiBaseUrl) {
-        console.error("APIのベースURLが設定されていません。");
-        return;
+      console.error("APIのベースURLが設定されていません。");
+      return;
     }
-    ;(async () => {
+    ; (async () => {
       try {
         const res = await fetch(
           `${apiBaseUrl}/lesson_attendance/calendar`,
@@ -140,7 +140,7 @@ export default function ClassRegistrationPage() {
     { period: 5, label: "5限\n13:30~14:25", time: "13:30-14:25" },
     { period: 6, label: "6限\n14:35~15:30", time: "14:35-15:30" },
   ]
-  
+
   function toJapaneseDayOfWeek(d: Date) {
     const dayNum = d.getDay()
     const JpDays = ["日", "月", "火", "水", "木", "金", "土"]
@@ -299,7 +299,7 @@ export default function ClassRegistrationPage() {
                           </td>
                         )
                       }
-                      
+
                       const colors = getClassColors(info.classId);
                       return (
                         <td

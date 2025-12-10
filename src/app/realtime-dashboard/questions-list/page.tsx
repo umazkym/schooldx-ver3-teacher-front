@@ -12,22 +12,22 @@ function QuestionsListPageContent() {
   const lessonIdStr = searchParams.get("lesson_id");
   const lessonId = lessonIdStr ? parseInt(lessonIdStr, 10) : null;
 
-interface LessonThemeBlock {
-  lesson_theme_id: number;
-  lesson_theme_name: string;
-  material_name: string;
-  part_name: string | null;
-  chapter_name: string | null;
-  unit_name: string | null;
-}
+  interface LessonThemeBlock {
+    lesson_theme_id: number;
+    lesson_theme_name: string;
+    material_name: string;
+    part_name: string | null;
+    chapter_name: string | null;
+    unit_name: string | null;
+  }
 
-interface LessonInformation {
-  date: string;
-  day_of_week: string;
-  period: number;
-  lesson_name: string | null;
-  lesson_theme: Record<string, LessonThemeBlock>;
-}
+  interface LessonInformation {
+    date: string;
+    day_of_week: string;
+    period: number;
+    lesson_name: string | null;
+    lesson_theme: LessonThemeBlock[];  // APIはListを返す
+  }
 
   const [lessonInfo, setLessonInfo] = useState<LessonInformation | null>(null);
 
@@ -52,11 +52,11 @@ interface LessonInformation {
     try {
       const s = sessionStorage.getItem("selectedLessonMeta");
       if (s) setLessonMeta(JSON.parse(s));
-    } catch {}
+    } catch { }
     try {
       const s = sessionStorage.getItem("selectedContentInfo");
       if (s) setSelectedContent(JSON.parse(s));
-    } catch {}
+    } catch { }
   }, []);
 
   useEffect(() => {
@@ -66,10 +66,15 @@ interface LessonInformation {
         const res = await fetch(
           `${apiBaseUrl}/lesson_attendance/lesson_information?lesson_id=${lessonId}`
         );
-        if (!res.ok) return;
+        if (!res.ok) {
+          console.error(`lesson_information API failed: ${res.status}`);
+          return;
+        }
         const d = (await res.json()) as LessonInformation;
         setLessonInfo(d);
-      } catch {}
+      } catch (err) {
+        console.error('lesson_information fetch error:', err);
+      }
     })();
   }, [lessonId]);
 
@@ -77,7 +82,7 @@ interface LessonInformation {
   const dateInfo = dateSrc
     ? `${dateSrc.date} (${dateSrc.day_of_week}) / ${dateSrc.period}限目 ${dateSrc.lesson_name ?? ""}`
     : "";
-  const firstTheme = lessonInfo ? Object.values(lessonInfo.lesson_theme)[0] : undefined;
+  const firstTheme = lessonInfo?.lesson_theme?.[0];
   const src = selectedContent ?? firstTheme;
   const contentInfo = src
     ? `${src.lesson_theme_name} / ${src.material_name} ${src.part_name ?? ""} ${src.chapter_name ?? ""} ${src.unit_name ?? ""}`.trim()

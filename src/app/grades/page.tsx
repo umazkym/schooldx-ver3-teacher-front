@@ -19,7 +19,7 @@ type LessonCalendarItem = {
     class_name: string | null;
     lesson_name: string | null;
     delivery_status: boolean;
-    lesson_status: boolean;
+    lesson_status: number;  // 1=READY, 2=ACTIVE, 3=END
 };
 
 type RawDataItem = {
@@ -191,7 +191,7 @@ export default function GradesPage() {
                     const errorText = await rawRes.text();
                     console.error("Failed to fetch raw data:", rawRes.status, errorText);
                     throw new Error(`回答データの取得に失敗しました (Status: ${rawRes.status})`);
-                 }
+                }
                 setRawData(await rawRes.json());
 
                 if (commentRes.ok) {
@@ -311,7 +311,7 @@ export default function GradesPage() {
 
         let gradeAverage = -1;
         if (gradeSummary && gradeSummary.length > 0) {
-             const relevantSummaryItems = gradeSummary.filter(summaryItem =>
+            const relevantSummaryItems = gradeSummary.filter(summaryItem =>
                 Object.values(questionStats).some(stats => stats.question_id === summaryItem.question_id)
             );
 
@@ -321,10 +321,10 @@ export default function GradesPage() {
                 if (totalGradeAnswers > 0) {
                     gradeAverage = (totalGradeCorrect / totalGradeAnswers) * 100;
                 } else {
-                     gradeAverage = 0;
+                    gradeAverage = 0;
                 }
             } else {
-                 gradeAverage = -1;
+                gradeAverage = -1;
             }
         }
 
@@ -381,47 +381,47 @@ export default function GradesPage() {
     // --- JSX (メインコンポーネント) ---
     return (
         <div className="p-4 sm:p-6 md:p-8 bg-[#f4f7f9] min-h-screen">
-             <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                 <div className="flex items-center gap-2">
-                     <button onClick={() => router.push("/")} className="text-gray-600 hover:text-gray-900">&lt; 戻る</button>
-                 </div>
-                 <div className="flex flex-wrap items-center gap-4">
-                     <select
-                         value={selectedAcademicYear}
-                         onChange={(e) => setSelectedAcademicYear(parseInt(e.target.value, 10))}
-                         className="p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-                     >
-                         {availableYears.map(year => <option key={year} value={year}>{year}年度</option>)}
-                     </select>
-                     <select
-                         value={selectedClassId}
-                         onChange={(e) => {
-                             setSelectedClassId(e.target.value);
-                             setSelectedLessonId("");
-                             setRawData([]);
-                             setComments([]);
-                             setGradeSummary([]);
-                             setError(null);
-                         }}
-                         className="p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-                     >
-                         <option value="" disabled>クラスを選択</option>
-                         {classes.map(c => <option key={c.class_id} value={c.class_id}>{c.class_name}</option>)}
-                     </select>
-                     <select
-                         value={selectedLessonId}
-                         onChange={(e) => setSelectedLessonId(e.target.value)}
-                         disabled={!selectedClassId || lessons.length === 0}
-                         className="p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm disabled:bg-gray-100"
-                     >
-                         <option value="">授業を選択</option>
-                         {lessons.length === 0 && selectedClassId && <option disabled>授業データなし</option>}
-                         {lessons.map(l => <option key={l.lesson_id} value={l.lesson_id}>
-                             {formatDate(l.date)} {l.period}限 {l.lesson_name}
-                         </option>)}
-                     </select>
-                 </div>
-             </div>
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                    <button onClick={() => router.push("/")} className="text-gray-600 hover:text-gray-900">&lt; 戻る</button>
+                </div>
+                <div className="flex flex-wrap items-center gap-4">
+                    <select
+                        value={selectedAcademicYear}
+                        onChange={(e) => setSelectedAcademicYear(parseInt(e.target.value, 10))}
+                        className="p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    >
+                        {availableYears.map(year => <option key={year} value={year}>{year}年度</option>)}
+                    </select>
+                    <select
+                        value={selectedClassId}
+                        onChange={(e) => {
+                            setSelectedClassId(e.target.value);
+                            setSelectedLessonId("");
+                            setRawData([]);
+                            setComments([]);
+                            setGradeSummary([]);
+                            setError(null);
+                        }}
+                        className="p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    >
+                        <option value="" disabled>クラスを選択</option>
+                        {classes.map(c => <option key={c.class_id} value={c.class_id}>{c.class_name}</option>)}
+                    </select>
+                    <select
+                        value={selectedLessonId}
+                        onChange={(e) => setSelectedLessonId(e.target.value)}
+                        disabled={!selectedClassId || lessons.length === 0}
+                        className="p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm disabled:bg-gray-100"
+                    >
+                        <option value="">授業を選択</option>
+                        {lessons.length === 0 && selectedClassId && <option disabled>授業データなし</option>}
+                        {lessons.map(l => <option key={l.lesson_id} value={l.lesson_id}>
+                            {formatDate(l.date)} {l.period}限 {l.lesson_name}
+                        </option>)}
+                    </select>
+                </div>
+            </div>
 
             {loading && <div className="text-center py-10 text-gray-500">分析データを読み込み中...</div>}
             {!loading && error && <div className="text-center py-10 text-red-600 bg-red-50 p-4 rounded-lg">{error}</div>}
@@ -429,7 +429,7 @@ export default function GradesPage() {
                 <div className="text-center py-10 text-gray-500">クラスと授業を選択してください。</div>
             )}
             {!loading && !error && selectedLessonId && !statistics && (
-                 <div className="text-center py-10 text-gray-500">選択された授業の分析データが見つかりませんでした。</div>
+                <div className="text-center py-10 text-gray-500">選択された授業の分析データが見つかりませんでした。</div>
             )}
 
 
@@ -437,7 +437,7 @@ export default function GradesPage() {
                 <main className="space-y-8">
                     <div className="bg-white p-4 rounded-xl shadow-sm">
                         <h1 className="text-2xl font-bold text-gray-800">
-                            {selectedAcademicYear}年度 {selectedClass?.class_name || 'クラス情報なし'} {selectedLesson?.lesson_name || '授業情報なし'} 
+                            {selectedAcademicYear}年度 {selectedClass?.class_name || 'クラス情報なし'} {selectedLesson?.lesson_name || '授業情報なし'}
                         </h1>
                         <p className="text-gray-500">
                             {selectedLesson ? `${formatDate(selectedLesson.date)} ${selectedLesson.period}限` : '日付情報なし'}
@@ -481,25 +481,25 @@ export default function GradesPage() {
                         )}
                     </section>
 
-                     {/* ▼▼▼ 定性（アンケート）分析セクションのレイアウト修正 ▼▼▼ */}
-                     <section className="bg-white p-6 rounded-xl shadow-sm">
-                         <h2 className="text-xl font-bold text-gray-800 pb-2 mb-6 border-b-2 border-gray-200">アンケート分析</h2>
-                         {/* グリッドコンテナーに `md:grid-rows-1` を追加し、
+                    {/* ▼▼▼ 定性（アンケート）分析セクションのレイアウト修正 ▼▼▼ */}
+                    <section className="bg-white p-6 rounded-xl shadow-sm">
+                        <h2 className="text-xl font-bold text-gray-800 pb-2 mb-6 border-b-2 border-gray-200">アンケート分析</h2>
+                        {/* グリッドコンテナーに `md:grid-rows-1` を追加し、
                            `SurveySummaryChart` と `CommentsList` の親 `div` が高さを揃えるようにする 
                            ただし、`SurveySummaryChart` の内部の高さが可変なため、
                            `CommentsList` 側で高さを調整する方が確実
                          */}
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                             {/* 左側: アンケートグラフ */}
-                             <SurveySummaryChart summary={surveySummary} />
-                             
-                             {/* 右側: コメントリスト (高さを揃えるためにラッパーを追加) */}
-                             <div className="flex flex-col">
-                                 <CommentsList comments={comments} />
-                             </div>
-                         </div>
-                     </section>
-                     {/* ▲▲▲ 修正ここまで ▲▲▲ */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {/* 左側: アンケートグラフ */}
+                            <SurveySummaryChart summary={surveySummary} />
+
+                            {/* 右側: コメントリスト (高さを揃えるためにラッパーを追加) */}
+                            <div className="flex flex-col">
+                                <CommentsList comments={comments} />
+                            </div>
+                        </div>
+                    </section>
+                    {/* ▲▲▲ 修正ここまで ▲▲▲ */}
                 </main>
             )}
         </div>
@@ -537,7 +537,7 @@ const QuestionDetailCard = ({ label, stats, gradeAvg, questionNumber, maxTime }:
         orange: 'font-semibold text-orange-600 bg-orange-100 px-2 py-0.5 rounded',
         red: 'font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded',
     };
-    
+
     const fullQuestionLabel = [stats.unit_name, stats.lesson_theme_name]
         .filter(Boolean)
         .map(s => s?.trim())
@@ -554,11 +554,11 @@ const QuestionDetailCard = ({ label, stats, gradeAvg, questionNumber, maxTime }:
                         </h3>
                         {questionNumber && <span className="font-bold text-base text-gray-800 ml-2 flex-shrink-0">問{questionNumber}</span>}
                     </div>
-                    
+
                     <div className="flex items-baseline gap-2 text-xs flex-shrink-0 self-end">
                         <span className={rateClasses[rateColor]}>クラス正答率: {Math.round(correctRate)}%</span>
                         <span className="font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
-                           学年正答率: {gradeAvg != null ? `${Math.round(gradeAvg)}%` : "データなし"}
+                            学年正答率: {gradeAvg != null ? `${Math.round(gradeAvg)}%` : "データなし"}
                         </span>
                     </div>
                 </div>
@@ -607,7 +607,7 @@ const AnswerTimeDistribution = ({ stats, maxTime }: { stats: QuestionStats, maxT
                 <div className="flex items-center gap-3 text-xs text-gray-500">
                     {(avgCorrect !== null || avgIncorrect !== null) && (
                         <div className="flex items-center gap-1">
-                            <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/></svg>
+                            <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" /></svg>
                             <span>平均</span>
                         </div>
                     )}
@@ -615,7 +615,7 @@ const AnswerTimeDistribution = ({ stats, maxTime }: { stats: QuestionStats, maxT
                         <span className="w-1.5 h-1.5 rounded-full bg-green-400"></span>
                         <span>正解</span>
                     </div>
-                     <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
                         <span>不正解</span>
                     </div>
@@ -646,24 +646,24 @@ const DotPlot = ({ title, times, color, avgTime, maxTime }: { title: string, tim
                         const time = Number(timeStr);
                         const position = maxTime > 0 ? Math.min(100, Math.max(0, (time / maxTime) * 100)) : 0;
                         return Array.from({ length: Math.min(count, 5) }).map((_, i) => (
-                             <span
+                            <span
                                 key={`${time}-${i}`}
                                 className={`absolute bottom-0 w-2 h-2 rounded-full transform -translate-x-1/2 ${color === 'green' ? 'bg-green-400' : 'bg-gray-400'} dot dot-stack-${i + 1}`}
-                                style={{ left: `${position}%`, bottom: `${i * 9}px` }} 
+                                style={{ left: `${position}%`, bottom: `${i * 9}px` }}
                                 title={`${time}秒 (${count}人)`}
                             ></span>
                         ));
                     })}
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 h-4">
-                    <div className="absolute bottom-2 left-0 right-0 h-px bg-gray-400"></div> 
-                    <span className="absolute bottom-[-4px] text-xs text-gray-500 transform -translate-x-1/2" style={{ left: '0%' }}>0s</span> 
-                    <span className="absolute bottom-[-4px] text-xs text-gray-500 transform -translate-x-1/2" style={{ left: '50%' }}>{Math.round(maxTime / 2)}s</span> 
-                    <span className="absolute bottom-[-4px] text-xs text-gray-500 transform -translate-x-1/2" style={{ left: '100%' }}>{maxTime}s</span> 
-                     {avgTime !== null && times.length > 0 && (
-                        <div className="absolute bottom-2 w-3.5 h-3.5 transform -translate-x-1/2 translate-y-1/2" style={{ left: `${maxTime > 0 ? Math.min(100, Math.max(0, (avgTime / maxTime) * 100)) : 0}%` }} title={`平均: ${avgTime}秒`}> 
+                    <div className="absolute bottom-2 left-0 right-0 h-px bg-gray-400"></div>
+                    <span className="absolute bottom-[-4px] text-xs text-gray-500 transform -translate-x-1/2" style={{ left: '0%' }}>0s</span>
+                    <span className="absolute bottom-[-4px] text-xs text-gray-500 transform -translate-x-1/2" style={{ left: '50%' }}>{Math.round(maxTime / 2)}s</span>
+                    <span className="absolute bottom-[-4px] text-xs text-gray-500 transform -translate-x-1/2" style={{ left: '100%' }}>{maxTime}s</span>
+                    {avgTime !== null && times.length > 0 && (
+                        <div className="absolute bottom-2 w-3.5 h-3.5 transform -translate-x-1/2 translate-y-1/2" style={{ left: `${maxTime > 0 ? Math.min(100, Math.max(0, (avgTime / maxTime) * 100)) : 0}%` }} title={`平均: ${avgTime}秒`}>
                             <svg className={`w-full h-full ${color === 'green' ? 'text-green-600' : 'text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/>
+                                <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
                             </svg>
                         </div>
                     )}
@@ -721,22 +721,22 @@ const SurveySummaryChart = ({ summary }: { summary: LessonSurveySummary | null }
                     {Object.entries(labels)
                         .sort(([keyA], [keyB]) => parseInt(keyB) - parseInt(keyA))
                         .map(([key, label]) => {
-                        const value = data[key] || 0;
-                        const percentage = total > 0 ? (value / total) * 100 : 0;
-                        return (
-                            <div key={key} className="flex items-center gap-2">
-                                <span className="w-36 text-right text-gray-700">{label}</span>
-                                <div className="flex-grow bg-gray-200 rounded-full h-4 relative overflow-hidden">
-                                    {percentage > 0 && (
-                                        <div className="bg-sky-400 h-full rounded-full absolute top-0 left-0" style={{ width: `${percentage}%` }}></div>
-                                    )}
-                                    <span className={`absolute top-0 left-2 text-[10px] leading-4 font-medium ${percentage > 10 ? 'text-white' : 'text-gray-700'}`}>
-                                        {Math.round(percentage)}% ({value})
-                                    </span>
+                            const value = data[key] || 0;
+                            const percentage = total > 0 ? (value / total) * 100 : 0;
+                            return (
+                                <div key={key} className="flex items-center gap-2">
+                                    <span className="w-36 text-right text-gray-700">{label}</span>
+                                    <div className="flex-grow bg-gray-200 rounded-full h-4 relative overflow-hidden">
+                                        {percentage > 0 && (
+                                            <div className="bg-sky-400 h-full rounded-full absolute top-0 left-0" style={{ width: `${percentage}%` }}></div>
+                                        )}
+                                        <span className={`absolute top-0 left-2 text-[10px] leading-4 font-medium ${percentage > 10 ? 'text-white' : 'text-gray-700'}`}>
+                                            {Math.round(percentage)}% ({value})
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
-                        );
-                    })}
+                            );
+                        })}
                 </div>
             </div>
         );
@@ -759,12 +759,12 @@ const CommentsList = ({ comments }: { comments: CommentData[] }) => {
         // ▼▼▼ 高さを指定し、スクロールを追加 ▼▼▼
         <div className="flex flex-col h-full"> {/* 親のグリッドアイテム(div)が h-full (またはflex) である想定 */}
             <h3 className="font-semibold text-gray-700 mb-3 text-center text-sm flex-shrink-0">主なコメント</h3>
-            
+
             {/* スクロール可能な領域 (flex-1 で残りの高さをすべて使う) */}
             <div className="flex-1 min-h-0 overflow-y-auto space-y-2 bg-gray-50 border rounded-lg p-4">
                 {validComments.length > 0 ? (
                     validComments.map((c, i) => ( // ★ slice(0, 3) を削除
-                        <div key={c.student_id + '-' + i} className="bg-white p-3 rounded-lg text-sm text-gray-800 shadow-sm border border-gray-200"> 
+                        <div key={c.student_id + '-' + i} className="bg-white p-3 rounded-lg text-sm text-gray-800 shadow-sm border border-gray-200">
                             「{c.comment_text}」
                         </div>
                     ))
