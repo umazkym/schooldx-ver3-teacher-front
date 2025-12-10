@@ -879,9 +879,9 @@ function DashboardPageContent() {
     // 解答中: 黄色 + 鉛筆アイコン
     if (status === "pencil") {
       return (
-        <div className="flex flex-col items-center justify-center rounded-md bg-amber-400 text-white h-full min-h-[50px] animate-pulse">
+        <div className="flex flex-col items-center justify-center rounded-md bg-amber-400 text-white h-full min-h-[50px]">
           <span className="text-xs font-medium opacity-80">Q{label}</span>
-          <span className="text-xl">✏️</span>
+          <span className="text-xl">...</span>
         </div>
       );
     }
@@ -912,9 +912,8 @@ function DashboardPageContent() {
     }
     if (status === "pencil") {
       return (
-        <div className="flex items-center justify-center rounded bg-amber-100 text-amber-600 h-6 text-xs animate-pulse">
-          ✏
-        </div>
+        <div className="flex items-center justify-center rounded bg-amber-100 text-amber-600 h-6 text-xs">
+          ...</div>
       );
     }
     return (
@@ -947,9 +946,9 @@ function DashboardPageContent() {
     // 解答中: オレンジ背景 + 鉛筆（点滅）
     if (status === "pencil") {
       return (
-        <div className="flex flex-col items-center justify-center rounded-lg bg-[#F59E0B] text-white py-2 animate-pulse">
+        <div className="flex flex-col items-center justify-center rounded-lg bg-[#F59E0B] text-white py-2">
           <span className="text-[10px] font-medium opacity-90">Q{label}</span>
-          <span className="text-lg leading-none">✏️</span>
+          <span className="text-lg leading-none">...</span>
         </div>
       );
     }
@@ -1020,37 +1019,34 @@ function DashboardPageContent() {
       </div>
 
       {/* 授業情報とタイマー */}
-      <div className="mb-3 flex justify-between items-center">
-        <div className="text-gray-600">
-          <div className="text-lg font-medium">{dateInfoQuery}</div>
-          <div className="text-sm">{contentInfoQuery}</div>
+      <div className="text-gray-600 mb-2 flex justify-between items-start">
+        <div>
+          <div className="text-lg">{dateInfoQuery}</div>
+          <div>{contentInfoQuery}</div>
         </div>
-        {/* タイマーと操作 - 大きく強調 */}
-        <div className="flex items-center gap-4">
+        {/* タイマー表示 */}
+        <div className="flex items-center gap-6">
           <div
-            className={`w-24 h-24 border-4 rounded-full flex items-center justify-center text-3xl font-black cursor-pointer transition-all ${isRunning
-                ? 'border-[#F59E0B] text-[#F59E0B] bg-amber-50 animate-pulse'
-                : 'border-[#285AC8] text-[#285AC8] hover:bg-blue-50'
-              }`}
+            className="w-20 h-20 border-4 border-[#285AC8] rounded-full flex items-center justify-center text-[#285AC8] text-xl font-bold cursor-pointer hover:bg-blue-50"
             title="クリックして時間を変更"
             onClick={handleChangeTimer}
           >
             {timeStr}
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
             <button
-              className={`px-6 py-3 rounded-lg text-lg font-bold text-white transition-all ${!isLessonStarted || isRunning
+              className={`px-4 py-2 rounded font-bold text-white ${!isLessonStarted || isRunning
                 ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-[#285AC8] hover:bg-blue-700 shadow-md hover:shadow-lg'}`}
+                : 'bg-[#285AC8] hover:bg-blue-700'}`}
               onClick={startTimer}
               disabled={!isLessonStarted || isRunning}
             >
               演習開始
             </button>
             <button
-              className={`px-6 py-3 rounded-lg text-lg font-bold text-white transition-all ${!isRunning
+              className={`px-4 py-2 rounded font-bold text-white ${!isRunning
                 ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-red-500 hover:bg-red-600 shadow-md hover:shadow-lg'}`}
+                : 'bg-red-500 hover:bg-red-600'}`}
               onClick={stopTimer}
               disabled={!isRunning}
             >

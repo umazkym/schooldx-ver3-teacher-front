@@ -507,35 +507,35 @@ export default function GradesPage() {
 }
 
 
-// --- SummaryCard (変更なし) ---
+// --- SummaryCard (視認性向上版) ---
 const SummaryCard = ({ title, value, color, description, isProblemCard }: { title: string, value: string, color: string, description: string, isProblemCard?: boolean }) => {
     const colors = {
-        blue: { bg: 'bg-blue-50', text: 'text-blue-700', value: 'text-blue-800' },
-        gray: { bg: 'bg-gray-50', text: 'text-gray-600', value: 'text-gray-700' },
-        emerald: { bg: 'bg-emerald-50', text: 'text-emerald-700', value: 'text-emerald-800' },
-        amber: { bg: 'bg-amber-50', text: 'text-amber-700', value: 'text-amber-800' }
+        blue: { bg: 'bg-blue-100', border: 'border-blue-300', text: 'text-blue-700', value: 'text-blue-800' },
+        gray: { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-600', value: 'text-gray-700' },
+        emerald: { bg: 'bg-emerald-100', border: 'border-emerald-300', text: 'text-emerald-700', value: 'text-emerald-800' },
+        amber: { bg: 'bg-amber-100', border: 'border-amber-300', text: 'text-amber-700', value: 'text-amber-800' }
     };
     const c = colors[color as keyof typeof colors] || colors.gray;
-    const valueStyle = isProblemCard && value.length > 15 ? 'text-base' : 'text-lg';
+    const valueStyle = isProblemCard ? (value.length > 15 ? 'text-lg' : 'text-xl') : 'text-3xl';
 
     return (
-        <div className={`${c.bg} p-4 rounded-lg flex flex-col justify-center min-h-[140px] shadow-sm`} title={description}>
-            <p className={`${c.text} text-sm font-semibold mb-2 text-center`}>{title}</p>
-            <p className={`${c.value} ${valueStyle} font-bold break-words px-2 text-center`}>
+        <div className={`${c.bg} border-2 ${c.border} p-5 rounded-xl flex flex-col justify-center min-h-[160px] shadow-md`} title={description}>
+            <p className={`${c.text} text-base font-bold mb-3 text-center`}>{title}</p>
+            <p className={`${c.value} ${valueStyle} font-black break-words px-2 text-center`}>
                 {value}
             </p>
         </div>
     );
 };
 
-// --- QuestionDetailCard コンポーネント (変更なし) ---
+// --- QuestionDetailCard コンポーネント (視認性向上版) ---
 const QuestionDetailCard = ({ label, stats, gradeAvg, questionNumber, maxTime }: { label: string, stats: QuestionStats, gradeAvg?: number | null, questionNumber?: number, maxTime: number }) => {
     const correctRate = stats.total > 0 ? (stats.correct / stats.total) * 100 : 0;
     const rateColor = correctRate >= 80 ? 'green' : correctRate >= 50 ? 'orange' : 'red';
     const rateClasses = {
-        green: 'font-semibold text-green-600 bg-green-100 px-2 py-0.5 rounded',
-        orange: 'font-semibold text-orange-600 bg-orange-100 px-2 py-0.5 rounded',
-        red: 'font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded',
+        green: 'font-bold text-white bg-green-500 px-3 py-1 rounded-lg text-sm',
+        orange: 'font-bold text-white bg-orange-500 px-3 py-1 rounded-lg text-sm',
+        red: 'font-bold text-white bg-red-500 px-3 py-1 rounded-lg text-sm',
     };
 
     const fullQuestionLabel = [stats.unit_name, stats.lesson_theme_name]
@@ -545,42 +545,42 @@ const QuestionDetailCard = ({ label, stats, gradeAvg, questionNumber, maxTime }:
         .join(" / ");
 
     return (
-        <div className="border border-gray-200 rounded-lg p-4 space-y-3 flex flex-col bg-white shadow-sm">
+        <div className="border-2 border-gray-200 rounded-xl p-5 space-y-4 flex flex-col bg-white shadow-md">
             <div>
-                <div className="flex flex-col gap-2" title={`元のラベル: ${label}`}>
+                <div className="flex flex-col gap-3" title={`元のラベル: ${label}`}>
                     <div className="flex justify-between items-start">
-                        <h3 className="font-bold text-base text-gray-800 break-words" title={fullQuestionLabel || label}>
+                        <h3 className="font-bold text-lg text-gray-800 break-words" title={fullQuestionLabel || label}>
                             {stats.lesson_theme_name || label}
                         </h3>
-                        {questionNumber && <span className="font-bold text-base text-gray-800 ml-2 flex-shrink-0">問{questionNumber}</span>}
+                        {questionNumber && <span className="font-black text-lg text-[#285AC8] ml-2 flex-shrink-0">問{questionNumber}</span>}
                     </div>
 
-                    <div className="flex items-baseline gap-2 text-xs flex-shrink-0 self-end">
-                        <span className={rateClasses[rateColor]}>クラス正答率: {Math.round(correctRate)}%</span>
-                        <span className="font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
-                            学年正答率: {gradeAvg != null ? `${Math.round(gradeAvg)}%` : "データなし"}
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <span className={rateClasses[rateColor]}>クラス: {Math.round(correctRate)}%</span>
+                        <span className="font-bold text-gray-600 bg-gray-200 px-3 py-1 rounded-lg text-sm">
+                            学年: {gradeAvg != null ? `${Math.round(gradeAvg)}%` : "─"}
                         </span>
                     </div>
                 </div>
             </div>
             <div>
-                <p className="font-semibold text-xs text-gray-600 mb-2">回答選択率</p>
-                <div className="space-y-1 text-xs">
+                <p className="font-bold text-sm text-gray-700 mb-3">回答選択率</p>
+                <div className="space-y-2">
                     {['A', 'B', 'C', 'D'].map(choice => {
                         const isCorrect = choice === stats.correctChoice;
                         const percentage = stats.total > 0 ? ((stats.choiceDistribution[choice] || 0) / stats.total) * 100 : 0;
                         return (
-                            <div key={choice} className="flex items-center gap-2">
-                                <span className={`w-6 text-center ${isCorrect ? 'font-bold text-green-600' : 'text-gray-700'}`}>{choice}</span>
-                                <div className={`flex-grow ${isCorrect ? 'bg-green-100' : 'bg-gray-100'} rounded-full h-3 relative overflow-hidden`}>
+                            <div key={choice} className="flex items-center gap-3">
+                                <span className={`w-8 text-center text-base font-bold ${isCorrect ? 'text-green-600' : 'text-gray-600'}`}>{choice}</span>
+                                <div className={`flex-grow ${isCorrect ? 'bg-green-100' : 'bg-gray-100'} rounded-full h-5 relative overflow-hidden`}>
                                     {percentage > 0 && (
-                                        <div className={`${isCorrect ? 'bg-green-400' : 'bg-gray-400'} h-full rounded-full absolute top-0 left-0`} style={{ width: `${percentage}%` }}></div>
+                                        <div className={`${isCorrect ? 'bg-green-500' : 'bg-gray-400'} h-full rounded-full absolute top-0 left-0`} style={{ width: `${percentage}%` }}></div>
                                     )}
-                                    <span className={`absolute top-0 left-2 text-[10px] leading-3 font-medium ${percentage > 10 ? (isCorrect ? 'text-white' : 'text-gray-800') : (isCorrect ? 'text-green-700' : 'text-gray-700')}`}>
+                                    <span className={`absolute top-0 left-3 text-sm leading-5 font-bold ${percentage > 15 ? 'text-white' : (isCorrect ? 'text-green-700' : 'text-gray-700')}`}>
                                         {Math.round(percentage)}%
                                     </span>
                                 </div>
-                                <span className={`w-10 text-right ${isCorrect ? 'text-green-600 font-bold' : 'text-transparent'}`}>{isCorrect ? '(正解)' : ''}</span>
+                                {isCorrect && <span className="text-green-600 font-bold text-sm">正解</span>}
                             </div>
                         );
                     })}
