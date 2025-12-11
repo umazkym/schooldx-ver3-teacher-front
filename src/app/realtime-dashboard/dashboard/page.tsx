@@ -620,6 +620,80 @@ function DashboardPageContent() {
   }, [lessonId, calcIcon, calcProgress, getStartUnix, apiBaseUrl]);
   // ▲▲▲▲▲ 【修正】 ここまで ▲▲▲▲▲
 
+  // ▼▼▼▼▼ 【新規】 60秒ポーリング用: DBの値で全問題を強制上書き ▼▼▼▼▼
+  const fetchAndOverwriteAllData = useCallback(async () => {
+    if (!lessonId || !apiBaseUrl) return;
+    const currentStudents = studentsRef.current;
+    if (currentStudents.length === 0) return;
+
+    console.log('🔄 60秒ポーリング: 全問題をDBの値で強制上書き開始');
+
+    let allAnswersData: AnswerDataWithDetails[] = [];
+    try {
+      const url = `${apiBaseUrl}/api/answers/?lesson_id=${lessonId}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        if (res.status === 404) {
+          allAnswersData = [];
+        } else {
+          console.error(`Error fetching all answers data: ${res.status}`);
+          return;
+        }
+      } else {
+        allAnswersData = await res.json();
+      }
+    } catch (error) {
+      console.error(`Error fetching all answers data:`, error);
+      return;
+    }
+
+    const currentMap = dynamicQuestionMapRef.current;
+    if (!currentMap) {
+      console.log('60秒ポーリング: マップがまだ生成されていないためスキップ');
+      return;
+    }
+
+    // DBの値で強制上書き（保護ロジックなし）
+    setStudents(prevStudents => {
+      const answersByStudent = new Map<number, AnswerDataWithDetails[]>();
+      allAnswersData.forEach(answer => {
+        if (!answersByStudent.has(answer.student_id)) {
+          answersByStudent.set(answer.student_id, []);
+        }
+        answersByStudent.get(answer.student_id)!.push(answer);
+      });
+
+      return prevStudents.map(student => {
+        const answers = answersByStudent.get(student.id);
+        if (!answers || answers.length === 0) {
+          return student;
+        }
+
+        const studentUpdate: Partial<Student> = {};
+
+        answers.forEach(answer => {
+          const keys = currentMap[answer.question.lesson_question_id];
+          if (keys) {
+            const statusKey = keys.status;
+            const progressKey = keys.progress;
+            const startUnixKey = keys.startUnix;
+
+            // DBの値で強制上書き（保護なし）
+            studentUpdate[progressKey] = calcProgress(answer);
+            studentUpdate[statusKey] = calcIcon(answer);
+            const startUnixValue = getStartUnix(answer);
+            (studentUpdate as Record<string, number | null>)[startUnixKey] = startUnixValue;
+          }
+        });
+
+        return { ...student, ...studentUpdate };
+      });
+    });
+
+    console.log('🔄 60秒ポーリング: 強制上書き完了');
+  }, [lessonId, calcIcon, calcProgress, getStartUnix, apiBaseUrl]);
+  // ▲▲▲▲▲ 【新規】 ここまで ▲▲▲▲▲
+
   // Socket.IOイベントの購読ロジック
   useEffect(() => {
     const socket = getSocket();
@@ -675,13 +749,20 @@ function DashboardPageContent() {
     // 演習開始（isRunning=true）時にまず1回実行
     fetchAllStudentsData();
 
-    // その後、5秒ごとのポーリングを開始（リアルタイム更新のため）
-    // 回答中の進捗をリアルタイムで反映するために、APIから最新データを定期的に取得
-    const intervalId = setInterval(fetchAllStudentsData, 5000);
+    // 5秒ごとのポーリング（解答中の進捗更新用）
+    // correct/wrongは保護されたまま、pencilの問題のみ更新される
+    const fastIntervalId = setInterval(fetchAllStudentsData, 5000);
+
+    // 60秒ごとのポーリング（全問題を強制上書き）
+    // DBの値を正として、correct/wrongも含め全問題を上書き
+    const slowIntervalId = setInterval(fetchAndOverwriteAllData, 60000);
 
     // クリーンアップ関数
-    return () => clearInterval(intervalId);
-  }, [lessonId, isRunning, fetchAllStudentsData, students.length]); // ★ fetchAllStudentsData, students.length を依存配列に追加
+    return () => {
+      clearInterval(fastIntervalId);
+      clearInterval(slowIntervalId);
+    };
+  }, [lessonId, isRunning, fetchAllStudentsData, fetchAndOverwriteAllData, students.length]);
 
 
   // リアルタイム進捗バー更新: 解答中（status='pencil'）の問題の進捗をリアルタイムに更新
