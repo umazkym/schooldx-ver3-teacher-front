@@ -190,6 +190,16 @@ function SettingPageContent() {
   }
 
   function handleChangeTheme(rowIndex: number, tId: number) {
+    // ★対策1: 他の行で既に選択されているテーマIDかチェック
+    const isAlreadySelected = rows.some(
+      (row, idx) => idx !== rowIndex && row.selectedThemeId === tId
+    );
+
+    if (isAlreadySelected) {
+      alert("このテーマは既に選択されています。別のテーマを選択してください。");
+      return;
+    }
+
     setRows((prev) => {
       const newRows = [...prev]
       newRows[rowIndex] = {
@@ -216,6 +226,13 @@ function SettingPageContent() {
 
     if (themeIds.length === 0) {
       alert("登録するテーマを1つ以上選択してください。");
+      return;
+    }
+
+    // ★対策1追加: 重複チェック（バックエンドと二重防御）
+    const uniqueIds = new Set(themeIds);
+    if (themeIds.length !== uniqueIds.size) {
+      alert("同じテーマが複数選択されています。重複を解消してください。");
       return;
     }
 
