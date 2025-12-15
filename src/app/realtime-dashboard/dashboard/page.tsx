@@ -57,6 +57,7 @@ interface LessonThemeBlock {
   part_name: string | null;
   chapter_name: string | null;
   unit_name: string | null;
+  lesson_question_status?: number;  // 1=READY, 2=ACTIVE, 3=ENDED
 }
 
 interface LessonInformation {
@@ -129,6 +130,15 @@ function DashboardPageContent() {
         }
         const d = (await res.json()) as LessonInformation;
         setLessonInfo(d);
+
+        // ★追加: lesson_question_statusから演習状態を復元
+        // 選択中のテーマまたは最初のテーマのステータスを確認
+        const currentTheme = d.lesson_theme?.[0];
+        if (currentTheme?.lesson_question_status === 2) {
+          // ACTIVE状態なら演習アクティブ（ポーリング開始）
+          console.log('演習がACTIVE状態のため、ポーリングを開始します');
+          setIsExerciseActive(true);
+        }
       } catch (err) {
         console.error('lesson_information fetch error:', err);
       }
@@ -246,12 +256,16 @@ function DashboardPageContent() {
 
   const defaultMinutes = parseInt(timerQuery, 10) || 5;
   const [secondsLeft, setSecondsLeft] = useState(defaultMinutes * 60);
-  const [isRunning, setIsRunning] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);  // タイマーが動いているか
+  const [isExerciseActive, setIsExerciseActive] = useState(false);  // 演習がアクティブか（ポーリング用）
 
   const [isLessonStarted] = useState(true);
 
+  // メッセージ表示ロジック
   let message = "演習開始のボタンを押してください";
-  if (isRunning) {
+  if (isExerciseActive && !isRunning && secondsLeft <= 0) {
+    message = "タイマー終了：演習終了ボタンを押してください";
+  } else if (isRunning) {
     message = "時間になったら演習終了を押してください";
   } else if (!isRunning && secondsLeft > 0 && secondsLeft < defaultMinutes * 60) {
     message = "一時停止中...";
@@ -315,6 +329,7 @@ function DashboardPageContent() {
       console.log('API Response:', data.message);
 
       setIsRunning(true);
+      setIsExerciseActive(true);  // ★追加: 演習アクティブ
       const msg = `exercise_start,${themeId}`;
       socketRef.current?.emit("to_flutter", msg);
       console.log("🌐 Web send to server →", msg);
@@ -357,6 +372,7 @@ function DashboardPageContent() {
 
       // API成功後にタイマーを停止し、新しい形式でWebSocketメッセージを送信
       setIsRunning(false);
+      setIsExerciseActive(false);  // ★追加: 演習終了
       const message = `exercise_end,${themeId}`; // 新しいメッセージ形式
       socketRef.current?.emit("to_flutter", message);
       console.log("🌐 Web send to server →", message);
@@ -741,12 +757,12 @@ function DashboardPageContent() {
     };
   }, [fetchAllStudentsData, lessonId]);
 
-  // 修正6: タイマー起動時の初回データ取得とポーリング設定
+  // 修正6: 演習がアクティブな間ポーリングを実行（タイマー切れ後も継続）
   useEffect(() => {
-    // isRunning が false の時、または生徒リストが未ロードの時は何もしない
-    if (!lessonId || !isRunning || students.length === 0) return;
+    // isExerciseActive が false の時、または生徒リストが未ロードの時は何もしない
+    if (!lessonId || !isExerciseActive || students.length === 0) return;
 
-    // 演習開始（isRunning=true）時にまず1回実行
+    // 演習開始時にまず1回実行
     fetchAllStudentsData();
 
     // 5秒ごとのポーリング（解答中の進捗更新用）
@@ -762,7 +778,7 @@ function DashboardPageContent() {
       clearInterval(fastIntervalId);
       clearInterval(slowIntervalId);
     };
-  }, [lessonId, isRunning, fetchAllStudentsData, fetchAndOverwriteAllData, students.length]);
+  }, [lessonId, isExerciseActive, fetchAllStudentsData, fetchAndOverwriteAllData, students.length]);
 
 
   // リアルタイム進捗バー更新: 解答中（status='pencil'）の問題の進捗をリアルタイムに更新
