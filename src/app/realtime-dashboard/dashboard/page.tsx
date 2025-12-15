@@ -893,7 +893,7 @@ function DashboardPageContent() {
     switch (st) {
       // "done" は使われていないようなのでコメントアウト
       // case "done":
-      //   return <span className="text-green-600 font-bold">✓</span>;
+      //   return <span className="text-green-600 font-bold">〇</span>;
       case "correct":
         return <span className="text-green-600 font-bold">○</span>;
       case "wrong":
@@ -902,7 +902,7 @@ function DashboardPageContent() {
         return <span className="text-[#555454]">✎</span>;
       // "checked" も使われていないようなのでコメントアウト
       // case "checked":
-      //   return <span className="font-bold text-[#555454]">✓</span>;
+      //   return <span className="font-bold text-[#555454]">〇</span>;
       default:
         // 空白または初期状態を表す場合は何も表示しないか、'-' などを表示
         return <span className="text-gray-400">-</span>; // 例: 未回答時にハイフン表示
@@ -944,7 +944,7 @@ function DashboardPageContent() {
       return (
         <div className="flex flex-col items-center justify-center rounded-md bg-emerald-500 text-white h-full min-h-[50px]">
           <span className="text-xs font-medium opacity-80">Q{label}</span>
-          <span className="text-2xl font-bold">✓</span>
+          <span className="text-2xl font-bold">〇</span>
         </div>
       );
     }
@@ -953,7 +953,7 @@ function DashboardPageContent() {
       return (
         <div className="flex flex-col items-center justify-center rounded-md bg-red-500 text-white h-full min-h-[50px]">
           <span className="text-xs font-medium opacity-80">Q{label}</span>
-          <span className="text-2xl font-bold">✗</span>
+          <span className="text-2xl font-bold">×</span>
         </div>
       );
     }
@@ -962,7 +962,7 @@ function DashboardPageContent() {
       return (
         <div className="flex flex-col items-center justify-center rounded-md bg-amber-400 text-white h-full min-h-[50px]">
           <span className="text-xs font-medium opacity-80">Q{label}</span>
-          <span className="text-xl">...</span>
+          <span className="text-xl">✎</span>
         </div>
       );
     }
@@ -980,21 +980,21 @@ function DashboardPageContent() {
     if (status === "correct") {
       return (
         <div className="flex items-center justify-center rounded bg-[#C6EFD0] text-[#22C55E] h-6 text-sm font-bold">
-          ✓
+          〇
         </div>
       );
     }
     if (status === "wrong") {
       return (
         <div className="flex items-center justify-center rounded bg-[#FFD0D0] text-[#EF4444] h-6 text-sm font-bold">
-          ✗
+          ×
         </div>
       );
     }
     if (status === "pencil") {
       return (
         <div className="flex items-center justify-center rounded bg-amber-100 text-amber-600 h-6 text-xs">
-          ...</div>
+          ✎</div>
       );
     }
     return (
@@ -1011,7 +1011,7 @@ function DashboardPageContent() {
       return (
         <div className="flex flex-col items-center justify-center rounded-lg bg-[#22C55E] text-white py-2">
           <span className="text-[10px] font-medium opacity-90">Q{label}</span>
-          <span className="text-xl font-bold leading-none">✓</span>
+          <span className="text-xl font-bold leading-none">〇</span>
         </div>
       );
     }
@@ -1020,7 +1020,7 @@ function DashboardPageContent() {
       return (
         <div className="flex flex-col items-center justify-center rounded-lg bg-[#EF4444] text-white py-2">
           <span className="text-[10px] font-medium opacity-90">Q{label}</span>
-          <span className="text-xl font-bold leading-none">✗</span>
+          <span className="text-xl font-bold leading-none">×</span>
         </div>
       );
     }
@@ -1029,7 +1029,7 @@ function DashboardPageContent() {
       return (
         <div className="flex flex-col items-center justify-center rounded-lg bg-[#F59E0B] text-white py-2">
           <span className="text-[10px] font-medium opacity-90">Q{label}</span>
-          <span className="text-lg leading-none">...</span>
+          <span className="text-lg leading-none">✎</span>
         </div>
       );
     }
