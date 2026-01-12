@@ -26,28 +26,24 @@ interface AnswerDataWithDetails {
   };
 }
 
-// 画面表示用の型
+// 画面表示用の型 - 各問題の解答状況
+interface QuestionStatus {
+  status: string;          // '', 'pencil', 'correct', 'wrong'
+  progress: number;        // 0-100
+  startUnix: number | null;
+}
+
+// 画面表示用の型 - 生徒情報
 interface Student {
   id: number; // student_idと一致させる
   students_number: number; // students_tableの出席番号
   name: string;
-  // 4問分の解答状況
-  q1: string;
-  q1Progress: number;
-  q1StartUnix: number | null;
-  q2: string;
-  q2Progress: number;
-  q2StartUnix: number | null;
-  q3: string;
-  q3Progress: number;
-  q3StartUnix: number | null;
-  q4: string;
-  q4Progress: number;
-  q4StartUnix: number | null;
+  // 最大16問分の解答状況（動的配列）
+  questions: QuestionStatus[];
 }
 
-type StudentStringKey = { [K in keyof Student]: Student[K] extends string ? K : never }[keyof Student];
-type StudentNumberKey = { [K in keyof Student]: Student[K] extends number ? K : never }[keyof Student];
+// 問題IDからquestionsインデックスへのマッピング
+type QuestionIndexMap = { [questionId: number]: number };
 
 
 interface LessonThemeBlock {
@@ -149,14 +145,11 @@ function DashboardPageContent() {
   // 修正2: 生徒データを保持する State と、動的マップ用の State/Ref を定義
   const [students, setStudents] = useState<Student[]>([]);
   const studentsRef = useRef(students);
-  const [dynamicQuestionMap, setDynamicQuestionMap] = useState<{
-    [id: number]: {
-      status: StudentStringKey,
-      progress: StudentNumberKey,
-      startUnix: StudentNumberKey | keyof Pick<Student, 'q1StartUnix' | 'q2StartUnix' | 'q3StartUnix' | 'q4StartUnix'>
-    }
-  } | null>(null);
-  const dynamicQuestionMapRef = useRef(dynamicQuestionMap);
+  // 問題IDから配列インデックスへのマッピング（最大16問対応）
+  const [questionIndexMap, setQuestionIndexMap] = useState<QuestionIndexMap | null>(null);
+  const questionIndexMapRef = useRef(questionIndexMap);
+  // 問題の総数を保持
+  const [totalQuestions, setTotalQuestions] = useState<number>(0);
 
   // サーバー時刻とクライアント時刻のオフセットを保存（ミリ秒単位）
   const [timeOffset, setTimeOffset] = useState<number>(0);
@@ -172,8 +165,8 @@ function DashboardPageContent() {
     studentsRef.current = students;
   }, [students]);
   useEffect(() => {
-    dynamicQuestionMapRef.current = dynamicQuestionMap;
-  }, [dynamicQuestionMap]);
+    questionIndexMapRef.current = questionIndexMap;
+  }, [questionIndexMap]);
   useEffect(() => {
     timeOffsetRef.current = timeOffset;
   }, [timeOffset]);
@@ -211,22 +204,12 @@ function DashboardPageContent() {
         }[] = await res.json();
 
         // 取得した生徒データで students state を初期化
+        // questions配列は空で初期化し、後でAPIレスポンスから動的に設定される
         const initialStudents: Student[] = data.map(item => ({
           id: item.student_id,
           students_number: item.students_number,
           name: item.name,
-          q1: '',
-          q1Progress: 0,
-          q1StartUnix: null,
-          q2: '',
-          q2Progress: 0,
-          q2StartUnix: null,
-          q3: '',
-          q3Progress: 0,
-          q3StartUnix: null,
-          q4: '',
-          q4Progress: 0,
-          q4StartUnix: null,
+          questions: [], // 空配列で初期化、後でAPIレスポンスから問題数を取得して拡張
         }));
 
         // APIは既に出席番号順でソートされているはず (classes.py L.38)
@@ -493,79 +476,61 @@ function DashboardPageContent() {
     return 0;
   }, [defaultMinutes, getStartUnix, getServerUnixTime]);
 
-  // ▼▼▼▼▼ 【修正】 fetchAllStudentsData を修正 (API呼び出しを1回に変更) ▼▼▼▼▼
+  // ▼▼▼▼▼ 【修正】 fetchAllStudentsData を修正 (最大16問の動的配列対応) ▼▼▼▼▼
   const fetchAllStudentsData = useCallback(async () => {
     if (!lessonId || !apiBaseUrl) return;
     const currentStudents = studentsRef.current;
     if (currentStudents.length === 0) {
-      // console.log("生徒データがまだロードされていません。スキップします。");
       return; // 生徒データがまだない場合は何もしない
     }
 
     // (A) 全生徒の回答データを1回のAPI呼び出しで取得
     let allAnswersData: AnswerDataWithDetails[] = [];
     try {
-      const url = `${apiBaseUrl}/api/answers/?lesson_id=${lessonId}`; // ★ student_id を除去
+      const url = `${apiBaseUrl}/api/answers/?lesson_id=${lessonId}`;
       const res = await fetch(url);
       if (!res.ok) {
         if (res.status === 404) {
           console.log("回答データがまだありません (404)");
-          allAnswersData = []; // データがなければ空配列
+          allAnswersData = [];
         } else {
           console.error(`Error fetching all answers data: ${res.status}`);
-          return; // エラー時は更新しない
+          return;
         }
       } else {
         allAnswersData = await res.json();
       }
 
-      // デバッグ: APIから取得した生データを確認
       if (allAnswersData.length > 0) {
         console.log('🔍 Raw API response (ALL STUDENTS):', allAnswersData.length, 'records');
       }
 
     } catch (error) {
       console.error(`Error fetching all answers data:`, error);
-      return; // エラー時は更新しない
+      return;
     }
 
-    // (B) マッピングの決定
-    let currentMap = dynamicQuestionMapRef.current;
+    // (B) 問題IDからインデックスへのマッピングを決定
+    let currentMap = questionIndexMapRef.current;
     if (!currentMap) {
       // マップがまだない場合、取得したデータから動的に生成する
       const questionIds = new Set<number>();
-      // ★修正★ allAnswersData を直接イテレート
       allAnswersData.forEach(answer => {
         questionIds.add(answer.question.lesson_question_id);
       });
 
-      // 取得した問題IDをソートし、q1, q2, q3, q4 に割り当てる
-      const sortedQuestionIds = Array.from(questionIds).sort((a, b) => a - b);
+      // 取得した問題IDをソート（最大16問）
+      const sortedQuestionIds = Array.from(questionIds).sort((a, b) => a - b).slice(0, 16);
 
-      const newMap: {
-        [id: number]: {
-          status: StudentStringKey,
-          progress: StudentNumberKey,
-          startUnix: keyof Pick<Student, 'q1StartUnix' | 'q2StartUnix' | 'q3StartUnix' | 'q4StartUnix'>
-        }
-      } = {};
-      const keys: {
-        status: StudentStringKey,
-        progress: StudentNumberKey,
-        startUnix: keyof Pick<Student, 'q1StartUnix' | 'q2StartUnix' | 'q3StartUnix' | 'q4StartUnix'>
-      }[] = [
-          { status: 'q1', progress: 'q1Progress', startUnix: 'q1StartUnix' },
-          { status: 'q2', progress: 'q2Progress', startUnix: 'q2StartUnix' },
-          { status: 'q3', progress: 'q3Progress', startUnix: 'q3StartUnix' },
-          { status: 'q4', progress: 'q4Progress', startUnix: 'q4StartUnix' },
-        ];
-      sortedQuestionIds.slice(0, 4).forEach((qId, index) => {
-        newMap[qId] = keys[index];
+      const newMap: QuestionIndexMap = {};
+      sortedQuestionIds.forEach((qId, index) => {
+        newMap[qId] = index;
       });
-      console.log("動的マッピングを生成:", newMap);
-      setDynamicQuestionMap(newMap); // Stateを更新
+
+      console.log("動的マッピングを生成:", newMap, `問題数: ${sortedQuestionIds.length}`);
+      setQuestionIndexMap(newMap);
+      setTotalQuestions(sortedQuestionIds.length);
       currentMap = newMap;
-      // この実行サイクルでは更新された Ref の代わりにローカル変数を使う
     }
 
     // (C) 画面更新 (全生徒データをマッピング)
@@ -579,59 +544,50 @@ function DashboardPageContent() {
         answersByStudent.get(answer.student_id)!.push(answer);
       });
 
-      // prevStudents (生徒の枠) を元に更新
+      // マップ内の問題数を確認（最大インデックス+1）
+      const numQuestions = currentMap ? Math.max(...Object.values(currentMap)) + 1 : 0;
+
       return prevStudents.map(student => {
         const answers = answersByStudent.get(student.id);
 
-        // この生徒の回答データがない場合は、既存のstudentをそのまま返す
-        if (!answers || answers.length === 0) {
-          return student;
+        // 問題数分のquestions配列を初期化（既存データがあれば保持）
+        let newQuestions: QuestionStatus[] = [...student.questions];
+
+        // 配列サイズが足りない場合は拡張
+        while (newQuestions.length < numQuestions) {
+          newQuestions.push({ status: '', progress: 0, startUnix: null });
         }
 
-        const studentUpdate: Partial<Student> = {};
+        // この生徒の回答データがない場合は初期化済みの配列を返す
+        if (!answers || answers.length === 0) {
+          return { ...student, questions: newQuestions };
+        }
 
+        // 回答データを処理
         answers.forEach(answer => {
-          // ハードコードされたマップの代わりに、動的に生成したマップ(currentMap)を参照する
-          const keys = currentMap ? currentMap[answer.question.lesson_question_id] : undefined;
+          const qIndex = currentMap ? currentMap[answer.question.lesson_question_id] : undefined;
 
-          if (keys) {
-            const statusKey = keys.status;
-            const progressKey = keys.progress;
-            const startUnixKey = keys.startUnix;
-
+          if (qIndex !== undefined && qIndex < newQuestions.length) {
+            const currentStatus = newQuestions[qIndex].status;
             const newProgress = calcProgress(answer);
-            // const currentProgress = student[progressKey];
-
-            // プログレスバーを常に更新（pencil状態でも確実に更新されるように）
-            studentUpdate[progressKey] = newProgress;
-
-            // statusの更新: 一度「正解」または「不正解」になった問題は、statusを変更しない
-            const currentStatus = student[statusKey];
             const newStatus = calcIcon(answer);
-
-            // answer_start_unixを保存（リアルタイム進捗バー更新に使用）
             const startUnixValue = getStartUnix(answer);
-            (studentUpdate as Record<string, number | null>)[startUnixKey] = startUnixValue;
 
-            // デバッグ: startUnixの保存状況を確認
-            if (startUnixValue) {
-              // console.log(`Student ${student.id} - ${statusKey}: startUnix set to ${startUnixValue}, status: ${newStatus}`);
-            } else {
-              // console.warn(`Student ${student.id} - ${statusKey}: startUnix is null!`, {
-              //   answer_start_unix: answer.answer_start_unix,
-              //   answer_start_timestamp: answer.answer_start_timestamp
-              // });
-            }
+            // プログレスバーを常に更新
+            newQuestions[qIndex] = { ...newQuestions[qIndex], progress: newProgress };
 
-            // 現在のstatusが「correct」または「wrong」の場合は、新しいstatusに上書きしない
+            // startUnixを保存
+            newQuestions[qIndex].startUnix = startUnixValue;
+
+            // 現在のstatusが「correct」または「wrong」の場合は上書きしない
             if (currentStatus !== 'correct' && currentStatus !== 'wrong') {
-              studentUpdate[statusKey] = newStatus;
+              newQuestions[qIndex].status = newStatus;
             }
           }
         });
-        // 既存の student データと更新データをマージ
-        return { ...student, ...studentUpdate };
-      })
+
+        return { ...student, questions: newQuestions };
+      });
     });
   }, [lessonId, calcIcon, calcProgress, getStartUnix, apiBaseUrl]);
   // ▲▲▲▲▲ 【修正】 ここまで ▲▲▲▲▲
@@ -663,7 +619,7 @@ function DashboardPageContent() {
       return;
     }
 
-    const currentMap = dynamicQuestionMapRef.current;
+    const currentMap = questionIndexMapRef.current;
     if (!currentMap) {
       console.log('60秒ポーリング: マップがまだ生成されていないためスキップ');
       return;
@@ -679,30 +635,34 @@ function DashboardPageContent() {
         answersByStudent.get(answer.student_id)!.push(answer);
       });
 
+      const numQuestions = Math.max(...Object.values(currentMap)) + 1;
+
       return prevStudents.map(student => {
         const answers = answersByStudent.get(student.id);
-        if (!answers || answers.length === 0) {
-          return student;
+
+        // 問題数分のquestions配列を初期化
+        let newQuestions: QuestionStatus[] = [...student.questions];
+        while (newQuestions.length < numQuestions) {
+          newQuestions.push({ status: '', progress: 0, startUnix: null });
         }
 
-        const studentUpdate: Partial<Student> = {};
+        if (!answers || answers.length === 0) {
+          return { ...student, questions: newQuestions };
+        }
 
         answers.forEach(answer => {
-          const keys = currentMap[answer.question.lesson_question_id];
-          if (keys) {
-            const statusKey = keys.status;
-            const progressKey = keys.progress;
-            const startUnixKey = keys.startUnix;
-
+          const qIndex = currentMap[answer.question.lesson_question_id];
+          if (qIndex !== undefined && qIndex < newQuestions.length) {
             // DBの値で強制上書き（保護なし）
-            studentUpdate[progressKey] = calcProgress(answer);
-            studentUpdate[statusKey] = calcIcon(answer);
-            const startUnixValue = getStartUnix(answer);
-            (studentUpdate as Record<string, number | null>)[startUnixKey] = startUnixValue;
+            newQuestions[qIndex] = {
+              status: calcIcon(answer),
+              progress: calcProgress(answer),
+              startUnix: getStartUnix(answer)
+            };
           }
         });
 
-        return { ...student, ...studentUpdate };
+        return { ...student, questions: newQuestions };
       });
     });
 
@@ -797,88 +757,34 @@ function DashboardPageContent() {
     });
 
     const timer = setInterval(() => {
-      const currentMap = dynamicQuestionMapRef.current;
-      const tickNow = Math.floor(Date.now() / 1000);
-      // console.log(`⏱️ Updating progress (5s tick). Map exists: ${!!currentMap}, current unix: ${tickNow}`);
-      // currentMapがnullの場合でも、固定キー（q1, q2, q3, q4）で進捗を更新
+      const currentMap = questionIndexMapRef.current;
+
+      // マップがない場合はスキップ
+      if (!currentMap) return;
 
       setStudents(prevStudents =>
         prevStudents.map(student => {
-          const studentUpdate: Partial<Student> = {};
+          const newQuestions = [...student.questions];
           let hasUpdate = false;
 
-          // 動的マップが存在する場合は、マップに基づいて処理
-          if (currentMap) {
-            Object.keys(currentMap).forEach(questionIdStr => {
-              const qId = parseInt(questionIdStr, 10);
-              const keyInfo = currentMap[qId];
+          // 各問題に対して進捗を更新
+          newQuestions.forEach((q, index) => {
+            // 解答中（status='pencil'）かつstartUnixが設定されている場合のみ更新
+            if (q.status === 'pencil' && q.startUnix != null && q.startUnix > 0) {
+              const nowUnix = getServerUnixTime();
+              const diff = nowUnix - q.startUnix;
+              const newProgress = Math.min(100, (diff / (defaultMinutes * 60)) * 100);
 
-              const statusKey = keyInfo.status;
-              const progressKey = keyInfo.progress;
-              const startUnixKey = keyInfo.startUnix;
-
-              // 解答中（status='pencil'）かつanswer_start_unixが設定されている場合のみ更新
-              if (student[statusKey] === 'pencil') {
-                if (student[startUnixKey] != null && student[startUnixKey] > 0) {
-                  const startUnix = student[startUnixKey] as number;
-                  const nowUnix = getServerUnixTime(); // サーバー時刻を使用
-                  const diff = nowUnix - startUnix;
-                  const newProgress = Math.min(100, (diff / (defaultMinutes * 60)) * 100);
-
-                  // console.log(`📊 Student ${student.id} - ${statusKey}: progress ${student[progressKey]}% -> ${newProgress.toFixed(1)}% (diff: ${diff}s)`);
-
-                  // 進捗が変わった場合のみ更新
-                  if (newProgress !== student[progressKey]) {
-                    studentUpdate[progressKey] = newProgress;
-                    hasUpdate = true;
-                  }
-                } else {
-                  // console.warn(`⚠️ Student ${student.id} - ${statusKey}: pencil status but no startUnix (${student[startUnixKey]})`);
-                }
+              // 進捗が変わった場合のみ更新
+              if (newProgress !== q.progress) {
+                newQuestions[index] = { ...q, progress: newProgress };
+                hasUpdate = true;
               }
-            });
-          } else {
-            // マップがまだ生成されていない場合は、固定キーで更新
-            const fixedKeys: Array<{
-              status: StudentStringKey,
-              progress: StudentNumberKey,
-              startUnix: keyof Pick<Student, 'q1StartUnix' | 'q2StartUnix' | 'q3StartUnix' | 'q4StartUnix'>
-            }> = [
-                { status: 'q1', progress: 'q1Progress', startUnix: 'q1StartUnix' },
-                { status: 'q2', progress: 'q2Progress', startUnix: 'q2StartUnix' },
-                { status: 'q3', progress: 'q3Progress', startUnix: 'q3StartUnix' },
-                { status: 'q4', progress: 'q4Progress', startUnix: 'q4StartUnix' },
-              ];
-
-            fixedKeys.forEach(keyInfo => {
-              const statusKey = keyInfo.status;
-              const progressKey = keyInfo.progress;
-              const startUnixKey = keyInfo.startUnix;
-
-              // 解答中（status='pencil'）かつanswer_start_unixが設定されている場合のみ更新
-              if (student[statusKey] === 'pencil') {
-                if (student[startUnixKey] != null && student[startUnixKey] > 0) {
-                  const startUnix = student[startUnixKey] as number;
-                  const nowUnix = getServerUnixTime(); // サーバー時刻を使用
-                  const diff = nowUnix - startUnix;
-                  const newProgress = Math.min(100, (diff / (defaultMinutes * 60)) * 100);
-
-                  // console.log(`📊 [Fixed] Student ${student.id} - ${statusKey}: progress ${student[progressKey]}% -> ${newProgress.toFixed(1)}% (diff: ${diff}s)`);
-
-                  // 進捗が変わった場合のみ更新
-                  if (newProgress !== student[progressKey]) {
-                    studentUpdate[progressKey] = newProgress;
-                    hasUpdate = true;
-                  }
-                } else {
-                  // console.warn(`⚠️ [Fixed] Student ${student.id} - ${statusKey}: pencil status but no startUnix (${student[startUnixKey]})`);
-                }
-              }
-            });
-          }
+            }
+          });
 
           // 更新がある場合のみ新しいオブジェクトを返す
-          return hasUpdate ? { ...student, ...studentUpdate } : student;
+          return hasUpdate ? { ...student, questions: newQuestions } : student;
         })
       );
     }, 5000); // 5秒ごとに実行
@@ -926,18 +832,17 @@ function DashboardPageContent() {
   }
 
 
-  function calcQAPercentage(
-    arr: Student[],
-    key: "q1" | "q2" | "q3" | "q4"
-  ): number {
+  // 特定の問題インデックスの正答率を計算
+  function calcQAPercentage(arr: Student[], questionIndex: number): number {
     let correctCount = 0;
     let wrongCount = 0;
     for (const st of arr) {
-      if (st[key] === "correct") correctCount++;
-      if (st[key] === "wrong") wrongCount++;
+      const q = st.questions[questionIndex];
+      if (q?.status === "correct") correctCount++;
+      if (q?.status === "wrong") wrongCount++;
     }
     const sum = correctCount + wrongCount;
-    if (sum === 0) return 0; // 回答者がいない場合は0%
+    if (sum === 0) return 0;
     return (correctCount / sum) * 100;
   }
 
@@ -1020,40 +925,50 @@ function DashboardPageContent() {
     );
   }
 
-  // 大きな正誤表示セル（後方からも見やすい）
+  // 大きな正誤表示セル（後方からも見やすい） - コンパクト版（最大16問対応）
   function LargeStatusCell({ label, status }: { label: string; status: string }) {
-    // 正解: 緑背景 + 大きなチェック
+    // 正解: 緑背景 + チェック
     if (status === "correct") {
       return (
-        <div className="flex flex-col items-center justify-center rounded-lg bg-[#22C55E] text-white py-2">
-          <span className="text-[10px] font-medium opacity-90">Q{label}</span>
-          <span className="text-xl font-bold leading-none">〇</span>
+        <div className="flex flex-col items-center justify-center rounded-md bg-[#22C55E] text-white py-1 min-h-[32px]">
+          <span className="text-[8px] font-medium opacity-90">Q{label}</span>
+          <span className="text-sm font-bold leading-none">〇</span>
         </div>
       );
     }
-    // 不正解: 赤背景 + 大きなバツ
+    // 不正解: 赤背景 + バツ
     if (status === "wrong") {
       return (
-        <div className="flex flex-col items-center justify-center rounded-lg bg-[#EF4444] text-white py-2">
-          <span className="text-[10px] font-medium opacity-90">Q{label}</span>
-          <span className="text-xl font-bold leading-none">×</span>
+        <div className="flex flex-col items-center justify-center rounded-md bg-[#EF4444] text-white py-1 min-h-[32px]">
+          <span className="text-[8px] font-medium opacity-90">Q{label}</span>
+          <span className="text-sm font-bold leading-none">×</span>
         </div>
       );
     }
-    // 解答中: オレンジ背景 + 鉛筆（点滅）
+    // 解答中: オレンジ背景 + 鉛筆
     if (status === "pencil") {
       return (
-        <div className="flex flex-col items-center justify-center rounded-lg bg-[#F59E0B] text-white py-2">
-          <span className="text-[10px] font-medium opacity-90">Q{label}</span>
-          <span className="text-lg leading-none">✎</span>
+        <div className="flex flex-col items-center justify-center rounded-md bg-[#F59E0B] text-white py-1 min-h-[32px]">
+          <span className="text-[8px] font-medium opacity-90">Q{label}</span>
+          <span className="text-xs leading-none">✎</span>
         </div>
       );
     }
     // 未回答: グレー背景
     return (
-      <div className="flex flex-col items-center justify-center rounded-lg bg-gray-200 text-gray-400 py-2">
-        <span className="text-[10px] font-medium opacity-60">Q{label}</span>
-        <span className="text-lg leading-none">─</span>
+      <div className="flex flex-col items-center justify-center rounded-md bg-gray-200 text-gray-400 py-1 min-h-[32px]">
+        <span className="text-[8px] font-medium opacity-60">Q{label}</span>
+        <span className="text-xs leading-none">─</span>
+      </div>
+    );
+  }
+
+  // 問題がない場合のグレー表示セル
+  function EmptyQuestionCell() {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-md bg-gray-100 text-gray-300 py-1 min-h-[32px]">
+        <span className="text-[8px] font-medium opacity-40">─</span>
+        <span className="text-xs leading-none">─</span>
       </div>
     );
   }
@@ -1154,33 +1069,46 @@ function DashboardPageContent() {
       </div>
 
       {/* 正答率サマリーバー */}
-      <div className="flex items-center justify-between mb-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
-        <span className="font-bold text-gray-700">正答率</span>
-        <div className="flex gap-4">
-          {[
-            { label: '問題1', key: 'q1' as const },
-            { label: '問題2', key: 'q2' as const },
-            { label: '問題3', key: 'q3' as const },
-            { label: '問題4', key: 'q4' as const },
-          ].map(({ label, key }) => {
-            const pct = Math.round(calcQAPercentage(students, key));
-            return (
-              <div key={key} className="flex items-center gap-2">
-                <span className="text-sm text-gray-600">{label}:</span>
-                <div className="w-24 h-4 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-[#4CB64B] transition-all duration-300"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <span className={`font-bold min-w-[40px] text-right ${pct >= 70 ? 'text-green-600' : pct >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
-                  {pct}%
-                </span>
-              </div>
-            );
-          })}
+      <div className="flex flex-col gap-2 mb-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+        <div className="flex items-center justify-between">
+          <span className="font-bold text-gray-700">正答率</span>
+          <span className="text-sm text-gray-500">
+            回答者: {students.filter(s => s.questions[0]?.status === 'correct' || s.questions[0]?.status === 'wrong' || s.questions[0]?.status === 'pencil').length} / {students.length}名
+          </span>
         </div>
-        <span className="text-sm text-gray-500">回答者: {students.filter(s => s.q1 === 'correct' || s.q1 === 'wrong' || s.q1 === 'pencil').length} / {students.length}名</span>
+        {/* 4問ごとに行を分割 */}
+        {Array.from({ length: Math.ceil(totalQuestions / 4) }).map((_, rowIndex) => (
+          <div key={rowIndex} className="flex gap-4">
+            {[0, 1, 2, 3].map(colIndex => {
+              const qIndex = rowIndex * 4 + colIndex;
+              const hasQuestion = qIndex < totalQuestions;
+              if (!hasQuestion) {
+                return (
+                  <div key={qIndex} className="flex items-center gap-2 opacity-50">
+                    <span className="text-sm text-gray-400">問題{qIndex + 1}:</span>
+                    <div className="w-24 h-4 bg-gray-100 rounded-full" />
+                    <span className="font-bold min-w-[40px] text-gray-300">─</span>
+                  </div>
+                );
+              }
+              const pct = Math.round(calcQAPercentage(students, qIndex));
+              return (
+                <div key={qIndex} className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">問題{qIndex + 1}:</span>
+                  <div className="w-24 h-4 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#4CB64B] transition-all duration-300"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className={`font-bold min-w-[40px] text-right ${pct >= 70 ? 'text-green-600' : pct >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
+                    {pct}%
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
       {/* 生徒一覧 - 横配置で視認性向上 */}
       <div
@@ -1204,12 +1132,23 @@ function DashboardPageContent() {
               <span className="text-2xl font-black text-[#285AC8]">{st.students_number}</span>
               <span className="text-base font-medium text-gray-700 truncate flex-1">{st.name}</span>
             </div>
-            {/* 問題1-4の正誤表示 - 大きく見やすく */}
-            <div className="grid grid-cols-4 gap-1 p-2">
-              <LargeStatusCell label="1" status={st.q1} />
-              <LargeStatusCell label="2" status={st.q2} />
-              <LargeStatusCell label="3" status={st.q3} />
-              <LargeStatusCell label="4" status={st.q4} />
+            {/* 問題の正誤表示 - 4問ごとに行を分割（コンパクト表示） */}
+            <div className="p-1">
+              {Array.from({ length: Math.ceil(totalQuestions / 4) || 1 }).map((_, rowIndex) => (
+                <div key={rowIndex} className="grid grid-cols-4 gap-0.5 mb-0.5 last:mb-0">
+                  {[0, 1, 2, 3].map(colIndex => {
+                    const qIndex = rowIndex * 4 + colIndex;
+                    const hasQuestion = qIndex < totalQuestions;
+
+                    if (!hasQuestion) {
+                      return <EmptyQuestionCell key={qIndex} />;
+                    }
+
+                    const q = st.questions[qIndex];
+                    return <LargeStatusCell key={qIndex} label={String(qIndex + 1)} status={q?.status || ''} />;
+                  })}
+                </div>
+              ))}
             </div>
           </div>
         ))}
