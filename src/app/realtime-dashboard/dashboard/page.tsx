@@ -1102,47 +1102,31 @@ function DashboardPageContent() {
         </div>
       </div>
 
-      {/* 正答率サマリーバー */}
-      <div className="flex flex-col gap-2 mb-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
-        <div className="flex items-center justify-between">
-          <span className="font-bold text-gray-700">正答率</span>
-          <span className="text-sm text-gray-500">
-            回答者: {students.filter(s => s.questions[0]?.status === 'correct' || s.questions[0]?.status === 'wrong' || s.questions[0]?.status === 'pencil').length} / {students.length}名
-          </span>
-        </div>
-        {/* 4問ごとに行を分割 */}
-        {Array.from({ length: Math.ceil(totalQuestions / 4) }).map((_, rowIndex) => (
-          <div key={rowIndex} className="flex gap-4">
-            {[0, 1, 2, 3].map(colIndex => {
-              const qIndex = rowIndex * 4 + colIndex;
-              const hasQuestion = qIndex < totalQuestions;
-              if (!hasQuestion) {
-                return (
-                  <div key={qIndex} className="flex items-center gap-2 opacity-50">
-                    <span className="text-sm text-gray-400">問題{qIndex + 1}:</span>
-                    <div className="w-24 h-4 bg-gray-100 rounded-full" />
-                    <span className="font-bold min-w-[40px] text-gray-300">─</span>
-                  </div>
-                );
-              }
-              const pct = Math.round(calcQAPercentage(students, qIndex));
-              return (
-                <div key={qIndex} className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">問題{qIndex + 1}:</span>
-                  <div className="w-24 h-4 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-[#4CB64B] transition-all duration-300"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <span className={`font-bold min-w-[40px] text-right ${pct >= 70 ? 'text-green-600' : pct >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
-                    {pct}%
-                  </span>
+      {/* 正答率サマリーバー - コンパクトレイアウト */}
+      <div className="flex items-center gap-4 mb-3 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
+        <span className="font-bold text-gray-700 whitespace-nowrap">正答率</span>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 flex-1">
+          {Array.from({ length: totalQuestions }).map((_, qIndex) => {
+            const pct = Math.round(calcQAPercentage(students, qIndex));
+            return (
+              <div key={qIndex} className="flex items-center gap-1">
+                <span className="text-xs text-gray-500 w-5">Q{qIndex + 1}</span>
+                <div className="w-16 h-3 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#4CB64B] transition-all duration-300"
+                    style={{ width: `${pct}%` }}
+                  />
                 </div>
-              );
-            })}
-          </div>
-        ))}
+                <span className={`text-xs font-bold w-8 text-right ${pct >= 70 ? 'text-green-600' : pct >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
+                  {pct}%
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <span className="text-xs text-gray-500 whitespace-nowrap">
+          回答者: {students.filter(s => s.questions[0]?.status === 'correct' || s.questions[0]?.status === 'wrong' || s.questions[0]?.status === 'pencil').length}/{students.length}
+        </span>
       </div>
       {/* 生徒一覧 - 横配置で視認性向上 */}
       <div
