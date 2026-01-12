@@ -135,6 +135,37 @@ function DashboardPageContent() {
           console.log('演習がACTIVE状態のため、ポーリングを開始します');
           setIsExerciseActive(true);
         }
+
+        // ★追加: テーマの問題数を取得
+        if (currentTheme?.lesson_theme_id) {
+          try {
+            const qRes = await fetch(
+              `${apiBaseUrl}/api/lesson_themes/${currentTheme.lesson_theme_id}/questions/count`
+            );
+            if (qRes.ok) {
+              const qData = await qRes.json() as {
+                lesson_theme_id: number;
+                question_count: number;
+                question_ids: number[];
+              };
+              console.log(`問題数取得: ${qData.question_count}問`, qData.question_ids);
+
+              // totalQuestionsを設定
+              setTotalQuestions(qData.question_count);
+
+              // questionIndexMapを生成（問題IDから配列インデックスへのマッピング）
+              const newMap: QuestionIndexMap = {};
+              qData.question_ids.forEach((qId, index) => {
+                newMap[qId] = index;
+              });
+              setQuestionIndexMap(newMap);
+            } else {
+              console.error(`問題数取得APIエラー: ${qRes.status}`);
+            }
+          } catch (qErr) {
+            console.error('問題数取得エラー:', qErr);
+          }
+        }
       } catch (err) {
         console.error('lesson_information fetch error:', err);
       }
