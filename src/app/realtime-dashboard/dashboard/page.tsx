@@ -551,12 +551,13 @@ function DashboardPageContent() {
         const answers = answersByStudent.get(student.id);
 
         // 問題数分のquestions配列を初期化（既存データがあれば保持）
-        let newQuestions: QuestionStatus[] = [...student.questions];
-
+        const existingQuestions = [...student.questions];
         // 配列サイズが足りない場合は拡張
-        while (newQuestions.length < numQuestions) {
-          newQuestions.push({ status: '', progress: 0, startUnix: null });
-        }
+        const emptySlots = Array.from(
+          { length: Math.max(0, numQuestions - existingQuestions.length) },
+          () => ({ status: '', progress: 0, startUnix: null })
+        );
+        const newQuestions: QuestionStatus[] = [...existingQuestions, ...emptySlots];
 
         // この生徒の回答データがない場合は初期化済みの配列を返す
         if (!answers || answers.length === 0) {
@@ -641,10 +642,12 @@ function DashboardPageContent() {
         const answers = answersByStudent.get(student.id);
 
         // 問題数分のquestions配列を初期化
-        let newQuestions: QuestionStatus[] = [...student.questions];
-        while (newQuestions.length < numQuestions) {
-          newQuestions.push({ status: '', progress: 0, startUnix: null });
-        }
+        const existingQuestions = [...student.questions];
+        const emptySlots = Array.from(
+          { length: Math.max(0, numQuestions - existingQuestions.length) },
+          () => ({ status: '', progress: 0, startUnix: null })
+        );
+        const newQuestions: QuestionStatus[] = [...existingQuestions, ...emptySlots];
 
         if (!answers || answers.length === 0) {
           return { ...student, questions: newQuestions };
